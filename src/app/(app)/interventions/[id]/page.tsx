@@ -164,7 +164,13 @@ export default async function InterventionDetailPage({
               {intervention.description}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted">Lieu</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {intervention.location ?? "Non renseigne"}
+                </p>
+              </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Service</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
@@ -236,6 +242,7 @@ export default async function InterventionDetailPage({
                 id: intervention.id,
                 title: intervention.title,
                 description: intervention.description,
+                location: intervention.location,
                 categoryId: intervention.categoryId,
                 serviceId: intervention.serviceId,
               }}

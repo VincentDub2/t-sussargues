@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -10,6 +10,10 @@ import {
   type InterventionActionState,
 } from "@/app/(app)/interventions/actions";
 import type { Priority } from "@/generated/prisma/client";
+import {
+  OTHER_INTERVENTION_LOCATION_VALUE,
+  PREDEFINED_INTERVENTION_LOCATIONS,
+} from "@/lib/intervention-locations";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +46,9 @@ export function CreateInterventionForm({
 }: CreateInterventionFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(createIntervention, initialState);
+  const [locationPreset, setLocationPreset] = useState<string>(
+    PREDEFINED_INTERVENTION_LOCATIONS[0]
+  );
 
   useEffect(() => {
     if (state.createdId) {
@@ -79,6 +86,34 @@ export function CreateInterventionForm({
           required
           placeholder="Precisez le contexte, l'urgence et toute information utile."
         />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="locationPreset" className="text-sm font-medium text-foreground">
+          Lieu
+        </label>
+        <SelectField
+          id="locationPreset"
+          name="locationPreset"
+          value={locationPreset}
+          onChange={(event) => setLocationPreset(event.target.value)}
+          required
+        >
+          {PREDEFINED_INTERVENTION_LOCATIONS.map((location) => (
+            <option key={location} value={location}>
+              {location}
+            </option>
+          ))}
+          <option value={OTHER_INTERVENTION_LOCATION_VALUE}>Autre lieu</option>
+        </SelectField>
+        {locationPreset === OTHER_INTERVENTION_LOCATION_VALUE ? (
+          <Input
+            id="locationOther"
+            name="locationOther"
+            required
+            placeholder="Precisez le lieu"
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

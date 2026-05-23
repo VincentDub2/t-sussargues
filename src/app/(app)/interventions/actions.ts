@@ -13,6 +13,7 @@ import {
   formatNullableLabel,
   formatPriorityLabel,
 } from "@/lib/intervention-history";
+import { parseInterventionLocation } from "@/lib/intervention-locations";
 import {
   canEditIntervention,
   canManageInterventionWorkflow,
@@ -47,12 +48,13 @@ export async function createIntervention(
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const location = parseInterventionLocation(formData);
   const categoryId = toNullableString(formData.get("categoryId"));
   const serviceId = toNullableString(formData.get("serviceId"));
   const priority = parsePriorityValue(formData.get("priority")) ?? "normale";
 
-  if (!title || !description) {
-    return { error: "Le titre et la description sont obligatoires." };
+  if (!title || !description || !location) {
+    return { error: "Le titre, la description et le lieu sont obligatoires." };
   }
 
   const [initialStatus, category, service] = await Promise.all([
@@ -96,6 +98,7 @@ export async function createIntervention(
           ticketNumber: generateInterventionTicketNumber(),
           title,
           description,
+          location,
           priority,
           statusId: initialStatus.id,
           categoryId,
@@ -155,11 +158,12 @@ export async function updateInterventionDetails(
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const location = parseInterventionLocation(formData);
   const categoryId = toNullableString(formData.get("categoryId"));
   const serviceId = toNullableString(formData.get("serviceId"));
 
-  if (!title || !description) {
-    return { error: "Le titre et la description sont obligatoires." };
+  if (!title || !description || !location) {
+    return { error: "Le titre, la description et le lieu sont obligatoires." };
   }
 
   const intervention = await prisma.intervention.findFirst({
@@ -173,6 +177,7 @@ export async function updateInterventionDetails(
       serviceId: true,
       title: true,
       description: true,
+      location: true,
       category: {
         select: {
           name: true,
@@ -233,6 +238,7 @@ export async function updateInterventionDetails(
         data: {
           title,
           description,
+          location,
           categoryId,
           serviceId,
         },
@@ -246,6 +252,14 @@ export async function updateInterventionDetails(
 
       if (intervention.description !== description) {
         historyMessages.push("Description mise a jour.");
+      }
+
+      if ((intervention.location ?? null) !== location) {
+        historyMessages.push(
+          `Lieu modifie: ${formatNullableLabel(
+            intervention.location ?? null
+          )} -> ${formatNullableLabel(location)}.`
+        );
       }
 
       const currentCategoryName = intervention.category?.name ?? null;

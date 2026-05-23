@@ -1,12 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
   type InterventionActionState,
   updateInterventionDetails,
 } from "@/app/(app)/interventions/actions";
+import {
+  OTHER_INTERVENTION_LOCATION_VALUE,
+  PREDEFINED_INTERVENTION_LOCATIONS,
+} from "@/lib/intervention-locations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
@@ -17,6 +21,7 @@ type InterventionDetailsFormProps = {
     id: string;
     title: string;
     description: string;
+    location: string | null;
     categoryId: string | null;
     serviceId: string | null;
   };
@@ -45,6 +50,16 @@ export function InterventionDetailsForm({
 }: InterventionDetailsFormProps) {
   const action = updateInterventionDetails.bind(null, intervention.id);
   const [state, formAction] = useActionState(action, initialState);
+  const isKnownLocation =
+    intervention.location !== null &&
+    (PREDEFINED_INTERVENTION_LOCATIONS as readonly string[]).includes(intervention.location);
+  const initialLocationPreset =
+    isKnownLocation && intervention.location
+      ? intervention.location
+      : intervention.location
+        ? OTHER_INTERVENTION_LOCATION_VALUE
+        : "";
+  const [locationPreset, setLocationPreset] = useState<string>(initialLocationPreset);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -66,6 +81,38 @@ export function InterventionDetailsForm({
           required
           disabled={disabled}
         />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="locationPreset" className="text-sm font-medium text-foreground">
+          Lieu
+        </label>
+        <SelectField
+          id="locationPreset"
+          name="locationPreset"
+          value={locationPreset}
+          onChange={(event) => setLocationPreset(event.target.value)}
+          disabled={disabled}
+          required
+        >
+          <option value="">Choisir un lieu</option>
+          {PREDEFINED_INTERVENTION_LOCATIONS.map((location) => (
+            <option key={location} value={location}>
+              {location}
+            </option>
+          ))}
+          <option value={OTHER_INTERVENTION_LOCATION_VALUE}>Autre lieu</option>
+        </SelectField>
+        {locationPreset === OTHER_INTERVENTION_LOCATION_VALUE ? (
+          <Input
+            id="locationOther"
+            name="locationOther"
+            defaultValue={isKnownLocation ? "" : (intervention.location ?? "")}
+            required
+            disabled={disabled}
+            placeholder="Precisez le lieu"
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

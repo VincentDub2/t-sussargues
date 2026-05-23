@@ -124,6 +124,7 @@ model Intervention {
   ticketNumber  String                @unique
   title         String
   description   String
+  location      String?
   priority      Priority              @default(normale)
   statusId      String
   status        InterventionStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)

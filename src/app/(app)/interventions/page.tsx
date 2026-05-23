@@ -138,6 +138,10 @@ export default async function InterventionsPage() {
                 ticketNumber: intervention.ticketNumber,
                 title: intervention.title,
                 description: intervention.description,
+                location: intervention.location,
+                createdAt: intervention.createdAt.toISOString(),
+                updatedAt: intervention.updatedAt.toISOString(),
+                closedAt: intervention.closedAt?.toISOString() ?? null,
                 priority: intervention.priority,
                 statusId: intervention.statusId,
                 statusLabel: intervention.status.name,
@@ -146,10 +150,12 @@ export default async function InterventionsPage() {
                 serviceId: intervention.serviceId,
                 serviceName: intervention.service?.name ?? null,
                 categoryName: intervention.category?.name ?? null,
+                assignedToId: intervention.assignedToId,
                 assignedToName: intervention.assignedTo
                   ? `${intervention.assignedTo.firstName} ${intervention.assignedTo.lastName}`
                   : null,
               }))}
+              currentUserId={session.user.id}
             />
           </CardContent>
         </Card>
