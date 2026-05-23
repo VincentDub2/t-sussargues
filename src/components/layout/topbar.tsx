@@ -29,6 +29,14 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Utilisateurs",
     description: "Base administrative pour l'administration des comptes.",
   },
+  "/admin/users/invite": {
+    title: "Invitation utilisateur",
+    description: "Creation d'un nouveau compte par invitation email controlee.",
+  },
+  "/admin/services": {
+    title: "Services",
+    description: "Administration des services et de leur activite.",
+  },
 };
 
 type AppTopbarProps = {
@@ -43,8 +51,14 @@ type AppTopbarProps = {
 
 export function AppTopbar({ onOpenMobileNav, onSignOut, user }: AppTopbarProps) {
   const pathname = usePathname();
-  const meta = pageMeta[pathname] ?? pageMeta["/dashboard"];
-  const currentPage = appNavigation.find((item) => item.href === pathname);
+  const matchedPageEntry =
+    Object.entries(pageMeta)
+      .sort(([a], [b]) => b.length - a.length)
+      .find(([key]) => pathname.startsWith(key)) ?? null;
+  const meta = matchedPageEntry?.[1] ?? pageMeta["/dashboard"];
+  const currentPage =
+    appNavigation.find((item) => pathname.startsWith(item.href)) ??
+    (matchedPageEntry ? { title: matchedPageEntry[1].title } : undefined);
 
   return (
     <header className="border-b border-border bg-background">
