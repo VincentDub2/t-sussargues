@@ -40,7 +40,7 @@ export function AppTopbar({ onOpenMobileNav }: AppTopbarProps) {
   const currentPage = appNavigation.find((item) => item.href === pathname);
 
   return (
-    <header className="border-b border-border bg-background">
+    <header className="border-b border-primary bg-primary">
       <div className="flex flex-col gap-4 px-5 py-4 lg:px-8">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
@@ -48,22 +48,22 @@ export function AppTopbar({ onOpenMobileNav }: AppTopbarProps) {
               type="button"
               variant="outline"
               size="icon"
-              className="md:hidden"
+              className="md:hidden border-primary-foreground text-primary-foreground hover:bg-primary-deep"
               onClick={onOpenMobileNav}
             >
               <Menu />
             </Button>
 
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-primary-foreground/70">
                 <Link href="/dashboard">Application</Link>
                 <ChevronRight className="size-3" />
                 <span>{currentPage?.title ?? "Navigation"}</span>
               </div>
-              <h1 className="mt-2 text-2xl font-semibold text-foreground">
+              <h1 className="mt-2 text-2xl font-semibold text-primary-foreground">
                 {meta.title}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-primary-foreground/80">
                 {meta.description}
               </p>
             </div>
@@ -72,11 +72,11 @@ export function AppTopbar({ onOpenMobileNav }: AppTopbarProps) {
           <div className="hidden items-center gap-3 sm:flex">
             <div className="hidden w-56 lg:block">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-primary-foreground/60" />
                 <Input
                   aria-label="Recherche"
                   placeholder="Recherche rapide"
-                  className="pl-9"
+                  className="pl-9 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50"
                 />
               </div>
             </div>
@@ -86,10 +86,10 @@ export function AppTopbar({ onOpenMobileNav }: AppTopbarProps) {
 
         <div className="flex flex-wrap items-center gap-2">
           {topbarHighlights.map((item) => (
-            <Badge key={item.label} variant="outline" className="gap-2 px-3 py-1.5">
+            <Badge key={item.label} variant="outline" className="gap-2 px-3 py-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground">
               {"icon" in item && item.icon ? <item.icon className="size-3.5" /> : null}
               <span>{item.label}</span>
-              <span className="font-semibold text-foreground">
+              <span className="font-semibold text-primary-foreground">
                 {item.value}
               </span>
             </Badge>
