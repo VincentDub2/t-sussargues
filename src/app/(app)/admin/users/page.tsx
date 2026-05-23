@@ -2,12 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { UserAdminCard } from "@/components/admin/user-admin-card";
 import { PageShell } from "@/components/layout/page-shell";
-import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ROLE_LABELS, USER_STATUS_LABELS } from "@/lib/labels";
+import { ROLE_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 
 function getInvitationState(invitation: {
@@ -37,11 +37,19 @@ export default async function AdminUsersPage() {
     redirect("/dashboard");
   }
 
-  const [users, invitations, invitationLogs] = await Promise.all([
+  const [users, services, invitations, invitationLogs] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         service: true,
+      },
+    }),
+    prisma.service.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
       },
     }),
     prisma.userInvitation.findMany({
@@ -66,7 +74,13 @@ export default async function AdminUsersPage() {
       title="Utilisateurs"
       description="Point d'entree pour la gestion des comptes, des roles et des invitations."
     >
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-3">
+        <Link
+          href="/admin/services"
+          className={buttonVariants({ variant: "outline", className: "w-full sm:w-auto" })}
+        >
+          Gerer les services
+        </Link>
         <Link
           href="/admin/users/invite"
           className={buttonVariants({ className: "w-full sm:w-auto" })}
@@ -82,27 +96,22 @@ export default async function AdminUsersPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {users.map((user) => (
-              <div
+              <UserAdminCard
                 key={user.id}
-                className="flex items-center gap-3 rounded-lg border border-border p-4"
-              >
-                <Avatar className="size-11">
-                  {`${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`}
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <Badge variant="outline">{USER_STATUS_LABELS[user.status]}</Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-muted">{user.email}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {ROLE_LABELS[user.role]}
-                    {user.service ? ` · ${user.service.name}` : ""}
-                  </p>
-                </div>
-              </div>
+                currentUserId={session.user.id}
+                services={services}
+                user={{
+                  id: user.id,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  email: user.email,
+                  role: user.role,
+                  status: user.status,
+                  isActive: user.isActive,
+                  serviceId: user.serviceId,
+                  serviceName: user.service?.name ?? null,
+                }}
+              />
             ))}
           </CardContent>
         </Card>
