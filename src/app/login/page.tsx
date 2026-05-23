@@ -1,11 +1,19 @@
 import Link from "next/link";
 import { ArrowRight, LockKeyhole } from "lucide-react";
+import { redirect } from "next/navigation";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { auth } from "@/auth";
+import { LoginForm } from "@/components/auth/login-form";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const session = await auth();
+
+  if (session?.user?.isActive && session.user.status === "active") {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,var(--secondary)_0%,var(--background)_38%,var(--sand)_100%)] px-6 py-10">
       <div className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_440px]">
@@ -49,33 +57,13 @@ export default function LoginPage() {
               <div>
                 <CardTitle className="text-2xl">Connexion</CardTitle>
                 <CardDescription>
-                  Ecran de base en attente du branchement Auth.
+                  Connectez-vous avec le compte administrateur initialise.
                 </CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Email professionnel
-                </label>
-                <Input id="email" type="email" placeholder="prenom.nom@exemple.fr" />
-              </div>
-
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Mot de passe
-                </label>
-                <Input id="password" type="password" placeholder="••••••••" />
-              </div>
-
+              <LoginForm />
               <div className="flex flex-col gap-3">
-                <Button className="w-full">Connexion</Button>
                 <Link
                   href="/dashboard"
                   className={buttonVariants({
@@ -83,7 +71,7 @@ export default function LoginPage() {
                     className: "w-full",
                   })}
                 >
-                  Acceder au shell de l&apos;application
+                  Voir le shell cible
                   <ArrowRight />
                 </Link>
               </div>

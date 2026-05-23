@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Menu, Search } from "lucide-react";
 
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,9 +33,15 @@ const pageMeta: Record<string, { title: string; description: string }> = {
 
 type AppTopbarProps = {
   onOpenMobileNav: () => void;
+  onSignOut: () => Promise<void>;
+  user: {
+    name: string;
+    role: string;
+    initials: string;
+  };
 };
 
-export function AppTopbar({ onOpenMobileNav }: AppTopbarProps) {
+export function AppTopbar({ onOpenMobileNav, onSignOut, user }: AppTopbarProps) {
   const pathname = usePathname();
   const meta = pageMeta[pathname] ?? pageMeta["/dashboard"];
   const currentPage = appNavigation.find((item) => item.href === pathname);
@@ -80,7 +87,14 @@ export function AppTopbar({ onOpenMobileNav }: AppTopbarProps) {
                 />
               </div>
             </div>
-            <Avatar>TS</Avatar>
+            <div className="hidden text-right lg:block">
+              <p className="text-sm font-medium text-foreground">{user.name}</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                {user.role}
+              </p>
+            </div>
+            <Avatar>{user.initials}</Avatar>
+            <SignOutButton action={onSignOut} />
           </div>
         </div>
 

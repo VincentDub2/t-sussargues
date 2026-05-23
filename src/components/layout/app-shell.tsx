@@ -5,7 +5,17 @@ import { useState } from "react";
 import { AppSidebar } from "./sidebar";
 import { AppTopbar } from "./topbar";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+type AppShellProps = {
+  children: React.ReactNode;
+  user: {
+    name: string;
+    role: string;
+    initials: string;
+  };
+  onSignOut: () => Promise<void>;
+};
+
+export function AppShell({ children, user, onSignOut }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -19,7 +29,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onMobileClose={() => setMobileOpen(false)}
         />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <AppTopbar onOpenMobileNav={() => setMobileOpen(true)} />
+          <AppTopbar
+            user={user}
+            onOpenMobileNav={() => setMobileOpen(true)}
+            onSignOut={onSignOut}
+          />
           <main className="flex-1 px-5 py-6 lg:px-8">{children}</main>
         </div>
       </div>
