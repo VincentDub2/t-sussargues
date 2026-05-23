@@ -2,6 +2,18 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "@/generated/prisma/client";
 
+const requiredDelegates = [
+  "user",
+  "service",
+  "userInvitation",
+  "interventionCategory",
+  "interventionStatus",
+  "intervention",
+  "interventionHistory",
+  "purchaseRequest",
+  "notificationLog",
+] as const;
+
 function getDatabaseUrl() {
   const url = process.env.DATABASE_URL;
 
@@ -18,11 +30,20 @@ export function createPrismaClient() {
   return new PrismaClient({ adapter });
 }
 
+function hasCurrentSchemaDelegates(client: ReturnType<typeof createPrismaClient>) {
+  return requiredDelegates.every((delegate) => delegate in client);
+}
+
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: ReturnType<typeof createPrismaClient>;
 };
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+const cachedPrisma = globalForPrisma.prisma;
+
+export const prisma =
+  cachedPrisma && hasCurrentSchemaDelegates(cachedPrisma)
+    ? cachedPrisma
+    : createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

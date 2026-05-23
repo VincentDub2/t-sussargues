@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import type { Role } from "@/generated/prisma/client";
 import {
+  createInterventionHistoryEntry,
+  formatNullableLabel,
+  formatPriorityLabel,
+} from "@/lib/intervention-history";
+import {
   canEditIntervention,
   canManageInterventionWorkflow,
   generateInterventionTicketNumber,
@@ -81,19 +86,32 @@ export async function createIntervention(
   }
 
   try {
-    const intervention = await prisma.intervention.create({
-      data: {
-        ticketNumber: generateInterventionTicketNumber(),
-        title,
-        description,
-        priority,
-        statusId: initialStatus.id,
-        categoryId,
-        serviceId,
-        requesterId: session.user.id,
-        closedAt: initialStatus.isFinal ? new Date() : null,
-      },
-      select: { id: true, ticketNumber: true },
+    const intervention = await prisma.$transaction(async (tx) => {
+      const created = await tx.intervention.create({
+        data: {
+          ticketNumber: generateInterventionTicketNumber(),
+          title,
+          description,
+          priority,
+          statusId: initialStatus.id,
+          categoryId,
+          serviceId,
+          requesterId: session.user.id,
+          closedAt: initialStatus.isFinal ? new Date() : null,
+        },
+        select: { id: true, ticketNumber: true },
+      });
+
+      await createInterventionHistoryEntry(tx, {
+        interventionId: created.id,
+        actorId: session.user.id,
+        action: "creation",
+        message: `Intervention creee avec le statut initial et la priorite ${formatPriorityLabel(
+          priority
+        ).toLowerCase()}.`,
+      });
+
+      return created;
     });
 
     revalidatePath("/interventions");
@@ -140,6 +158,18 @@ export async function updateInterventionDetails(
       requesterId: true,
       assignedToId: true,
       serviceId: true,
+      title: true,
+      description: true,
+      category: {
+        select: {
+          name: true,
+        },
+      },
+      service: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 
@@ -164,13 +194,13 @@ export async function updateInterventionDetails(
     categoryId
       ? prisma.interventionCategory.findUnique({
           where: { id: categoryId },
-          select: { id: true },
+          select: { id: true, name: true },
         })
       : Promise.resolve(null),
     serviceId
       ? prisma.service.findUnique({
           where: { id: serviceId },
-          select: { id: true },
+          select: { id: true, name: true },
         })
       : Promise.resolve(null),
   ]);
@@ -184,14 +214,63 @@ export async function updateInterventionDetails(
   }
 
   try {
-    await prisma.intervention.update({
-      where: { id: interventionId },
-      data: {
-        title,
-        description,
-        categoryId,
-        serviceId,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.intervention.update({
+        where: { id: interventionId },
+        data: {
+          title,
+          description,
+          categoryId,
+          serviceId,
+        },
+      });
+
+      const historyMessages: string[] = [];
+
+      if (intervention.title !== title) {
+        historyMessages.push(`Titre mis a jour: "${intervention.title}" -> "${title}".`);
+      }
+
+      if (intervention.description !== description) {
+        historyMessages.push("Description mise a jour.");
+      }
+
+      const currentCategoryName = intervention.category?.name ?? null;
+      const updatedCategoryName = category?.name ?? null;
+
+      if (currentCategoryName !== updatedCategoryName) {
+        historyMessages.push(
+          `Categorie modifiee: ${formatNullableLabel(
+            currentCategoryName
+          )} -> ${formatNullableLabel(updatedCategoryName)}.`
+        );
+      }
+
+      const currentServiceName = intervention.service?.name ?? null;
+      const updatedServiceName = service?.name ?? null;
+
+      if (currentServiceName !== updatedServiceName) {
+        historyMessages.push(
+          `Service modifie: ${formatNullableLabel(currentServiceName)} -> ${formatNullableLabel(
+            updatedServiceName
+          )}.`
+        );
+      }
+
+      if (historyMessages.length === 0) {
+        historyMessages.push("Fiche intervention enregistree sans changement structurel visible.");
+      }
+
+      await Promise.all(
+        historyMessages.map((message) =>
+          createInterventionHistoryEntry(tx, {
+            interventionId,
+            actorId: session.user.id,
+            action: "modification",
+            message,
+          })
+        )
+      );
     });
   } catch (error) {
     return {
@@ -233,6 +312,19 @@ export async function updateInterventionWorkflow(
     select: {
       id: true,
       serviceId: true,
+      priority: true,
+      assignedToId: true,
+      status: {
+        select: {
+          name: true,
+        },
+      },
+      assignedTo: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
     },
   });
 
@@ -258,19 +350,21 @@ export async function updateInterventionWorkflow(
   const [status, assignee] = await Promise.all([
     prisma.interventionStatus.findUnique({
       where: { id: statusId },
-      select: { id: true, isFinal: true },
+      select: { id: true, isFinal: true, name: true },
     }),
     assignedToId
       ? prisma.user.findUnique({
           where: { id: assignedToId },
           select: {
             id: true,
-            role: true,
-            isActive: true,
-            status: true,
-            serviceId: true,
-          },
-        })
+          role: true,
+          isActive: true,
+          status: true,
+          serviceId: true,
+          firstName: true,
+          lastName: true,
+        },
+      })
       : Promise.resolve(null),
   ]);
 
@@ -299,14 +393,71 @@ export async function updateInterventionWorkflow(
   }
 
   try {
-    await prisma.intervention.update({
-      where: { id: interventionId },
-      data: {
-        statusId: status.id,
-        priority,
-        assignedToId,
-        closedAt: status.isFinal ? new Date() : null,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.intervention.update({
+        where: { id: interventionId },
+        data: {
+          statusId: status.id,
+          priority,
+          assignedToId,
+          closedAt: status.isFinal ? new Date() : null,
+        },
+      });
+
+      const historyEntries: Array<{
+        action: "statut" | "affectation";
+        message: string;
+      }> = [];
+
+      if (intervention.status.name !== status.name) {
+        historyEntries.push({
+          action: "statut",
+          message: `Statut modifie: ${intervention.status.name} -> ${status.name}.`,
+        });
+      }
+
+      if (intervention.priority !== priority) {
+        historyEntries.push({
+          action: "statut",
+          message: `Priorite modifiee: ${formatPriorityLabel(
+            intervention.priority
+          )} -> ${formatPriorityLabel(priority)}.`,
+        });
+      }
+
+      const previousAssigneeName = intervention.assignedTo
+        ? `${intervention.assignedTo.firstName} ${intervention.assignedTo.lastName}`.trim()
+        : null;
+      const nextAssigneeName = assignee
+        ? `${assignee.firstName} ${assignee.lastName}`.trim()
+        : null;
+
+      if ((intervention.assignedToId ?? null) !== (assignedToId ?? null)) {
+        historyEntries.push({
+          action: "affectation",
+          message: `Affectation modifiee: ${formatNullableLabel(
+            previousAssigneeName
+          )} -> ${formatNullableLabel(nextAssigneeName)}.`,
+        });
+      }
+
+      if (historyEntries.length === 0) {
+        historyEntries.push({
+          action: "statut",
+          message: "Pilotage revalide sans changement visible.",
+        });
+      }
+
+      await Promise.all(
+        historyEntries.map((entry) =>
+          createInterventionHistoryEntry(tx, {
+            interventionId,
+            actorId: session.user.id,
+            action: entry.action,
+            message: entry.message,
+          })
+        )
+      );
     });
   } catch (error) {
     return {

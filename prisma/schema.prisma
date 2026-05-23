@@ -24,6 +24,7 @@ model User {
   invitationsSent          UserInvitation[]  @relation("InvitationSender")
   requestedInterventions   Intervention[]    @relation("InterventionRequester")
   assignedInterventions    Intervention[]    @relation("InterventionAssignee")
+  interventionHistory      InterventionHistory[]
   requestedPurchases       PurchaseRequest[] @relation("PurchaseRequester")
   validatedPurchases       PurchaseRequest[] @relation("PurchaseValidator")
   createdAt                DateTime          @default(now())
@@ -103,23 +104,24 @@ model InterventionStatus {
 }
 
 model Intervention {
-  id            String               @id @default(cuid())
-  ticketNumber  String               @unique
+  id            String                @id @default(cuid())
+  ticketNumber  String                @unique
   title         String
   description   String
-  priority      Priority             @default(normale)
+  priority      Priority              @default(normale)
   statusId      String
-  status        InterventionStatus   @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  status        InterventionStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
   categoryId    String?
   category      InterventionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   serviceId     String?
-  service       Service?             @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  service       Service?              @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   requesterId   String
-  requester     User                 @relation("InterventionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  requester     User                  @relation("InterventionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   assignedToId  String?
-  assignedTo    User?                @relation("InterventionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  assignedTo    User?                 @relation("InterventionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  history       InterventionHistory[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
   closedAt      DateTime?
 
   @@index([statusId])
@@ -128,6 +130,21 @@ model Intervention {
   @@index([requesterId])
   @@index([assignedToId])
   @@index([priority])
+}
+
+model InterventionHistory {
+  id             String                    @id @default(cuid())
+  interventionId String
+  intervention   Intervention              @relation(fields: [interventionId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          User?                     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action         InterventionHistoryAction
+  message        String
+  createdAt      DateTime                  @default(now())
+
+  @@index([interventionId, createdAt])
+  @@index([actorId])
+  @@index([action])
 }
 
 model PurchaseRequest {
@@ -202,4 +219,11 @@ enum PurchaseStatus {
   en_commande
   receptionnee
   cloturee
+}
+
+enum InterventionHistoryAction {
+  creation
+  modification
+  statut
+  affectation
 }
