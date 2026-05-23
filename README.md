@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# T-Sussargues
 
-## Getting Started
+Socle technique de la future application T-Sussargues, basee sur Next.js, TypeScript, Tailwind CSS, shadcn/ui, Prisma et PostgreSQL.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 App Router
+- TypeScript
+- Tailwind CSS v4
+- shadcn/ui
+- Prisma
+- Prisma Postgres / PostgreSQL
+
+## Prerequis
+
+- Node.js `24.16.0` LTS
+- `pnpm` `10.12.1`
+
+Le repo pinne ces versions via `packageManager`, `engines`, `.nvmrc` et `.node-version`.
+
+## Installation
+
+1. Installer la bonne version de Node.js.
+2. Installer les dependances :
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Si `pnpm` n'est pas encore disponible globalement dans la bonne version :
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx -y pnpm@10.12.1 install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Initialiser l'environnement local :
 
-## Learn More
+```bash
+cp .env.example .env
+```
 
-To learn more about Next.js, take a look at the following resources:
+4. Lancer l'application :
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+L'application est ensuite disponible sur `http://localhost:3000`.
 
-## Deploy on Vercel
+## Variables d'environnement
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Le fichier `.env.example` documente les variables attendues :
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `DATABASE_URL`
+- `AUTH_SECRET`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `APP_URL`
+
+## Prisma et base de donnees
+
+Le projet est configure pour utiliser Prisma avec une base PostgreSQL. Pour cette etape 0, le setup par defaut documente est **Prisma Postgres** via `DATABASE_URL`.
+
+Commandes utiles :
+
+```bash
+pnpm prisma:validate
+pnpm prisma:generate
+```
+
+Le schema Prisma se trouve dans `prisma/schema.prisma` et la configuration Prisma dans `prisma.config.ts`.
+
+## Structure actuelle
+
+```txt
+src/
+  app/
+  components/
+    ui/
+  lib/
+  server/
+prisma/
+```
+
+Cette etape prepare seulement le socle. Les modules metier, l'authentification et les ecrans applicatifs viendront ensuite.
