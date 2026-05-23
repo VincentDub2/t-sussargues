@@ -9,10 +9,18 @@ import {
   Tags,
   Users2,
 } from "lucide-react";
+import type { ComponentType } from "react";
 
 import type { Role } from "@/generated/prisma/client";
 
-export const appNavigation = [
+type NavigationItem = {
+  title: string;
+  href: string;
+  icon: ComponentType<{ className?: string }>;
+  roles?: Role[];
+};
+
+export const appNavigation: NavigationItem[] = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -32,36 +40,36 @@ export const appNavigation = [
     title: "Utilisateurs",
     href: "/admin/users",
     icon: Users2,
-    roles: ["admin"] satisfies Role[],
+    roles: ["admin"],
   },
   {
     title: "Services",
     href: "/admin/services",
     icon: Settings2,
-    roles: ["admin"] satisfies Role[],
+    roles: ["admin"],
   },
   {
     title: "Categories",
     href: "/admin/categories",
     icon: Tags,
-    roles: ["admin"] satisfies Role[],
+    roles: ["admin"],
   },
   {
     title: "Statuts",
     href: "/admin/statuses",
     icon: ListChecks,
-    roles: ["admin"] satisfies Role[],
+    roles: ["admin"],
   },
   {
     title: "Notifications",
     href: "/admin/notifications",
     icon: Mail,
-    roles: ["admin"] satisfies Role[],
+    roles: ["admin"],
   },
 ] as const;
 
 export function getNavigationForRole(role: Role) {
-  return appNavigation.filter((item) => !("roles" in item) || item.roles.includes(role));
+  return appNavigation.filter((item) => !item.roles || item.roles.includes(role));
 }
 
 export const topbarHighlights = [
