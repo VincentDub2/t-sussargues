@@ -9,13 +9,13 @@ type PurchaseStatusBadgeProps = {
 const statusVariants: Record<PurchaseStatus, string> = {
   brouillon: "bg-secondary text-foreground",
   soumise: "bg-primary text-[var(--primary-foreground)]",
-  en_validation: "bg-secondary text-foreground",
-  informations_demandees: "bg-secondary text-foreground",
+  en_validation: "bg-info text-white",
+  informations_demandees: "bg-warning text-white",
   validee: "bg-success text-white",
   refusee: "bg-danger text-white",
   en_commande: "bg-secondary text-foreground",
   receptionnee: "bg-secondary text-foreground",
-  cloturee: "bg-secondary text-foreground",
+  cloturee: "bg-primary-deep text-[var(--primary-foreground)]",
 };
 
 export function PurchaseStatusBadge({ status }: PurchaseStatusBadgeProps) {

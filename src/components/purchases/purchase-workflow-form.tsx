@@ -19,11 +19,11 @@ type PurchaseWorkflowFormProps = {
     status: PurchaseStatus;
     validationComment: string | null;
   };
+  availableStatuses: PurchaseStatus[];
   disabled?: boolean;
 };
 
 const initialState: PurchaseActionState = {};
-const statuses: PurchaseStatus[] = ["validee", "refusee"];
 
 function SubmitButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
@@ -36,6 +36,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 
 export function PurchaseWorkflowForm({
   purchase,
+  availableStatuses,
   disabled = false,
 }: PurchaseWorkflowFormProps) {
   const action = updatePurchaseStatus.bind(null, purchase.id);
@@ -45,10 +46,15 @@ export function PurchaseWorkflowForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <label htmlFor="status" className="text-sm font-medium text-foreground">
-          Decision
+          Action
         </label>
-        <SelectField id="status" name="status" defaultValue="validee" disabled={disabled}>
-          {statuses.map((status) => (
+        <SelectField
+          id="status"
+          name="status"
+          defaultValue={availableStatuses[0] ?? purchase.status}
+          disabled={disabled}
+        >
+          {availableStatuses.map((status) => (
             <option key={status} value={status}>
               {PURCHASE_STATUS_LABELS[status]}
             </option>
@@ -58,13 +64,13 @@ export function PurchaseWorkflowForm({
 
       <div className="space-y-2">
         <label htmlFor="validationComment" className="text-sm font-medium text-foreground">
-          Commentaire
+          Commentaire de validation
         </label>
         <Textarea
           id="validationComment"
           name="validationComment"
           defaultValue={purchase.validationComment ?? ""}
-          placeholder="Optionnel"
+          placeholder="Ajoutez un commentaire pour cadrer la decision ou les informations attendues."
           disabled={disabled}
         />
       </div>
