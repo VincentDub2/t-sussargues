@@ -6,6 +6,7 @@ const requiredDelegates = [
   "user",
   "service",
   "userInvitation",
+  "passwordResetToken",
   "interventionCategory",
   "interventionStatus",
   "intervention",

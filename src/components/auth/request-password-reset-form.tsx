@@ -4,25 +4,27 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
-import type { LoginActionState } from "@/app/login/actions";
-import { authenticate } from "@/app/login/actions";
+import {
+  requestPasswordReset,
+  type RequestPasswordResetActionState,
+} from "@/app/reset-password/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const initialState: RequestPasswordResetActionState = {};
 
 function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
     <Button className="w-full" disabled={pending}>
-      {pending ? "Connexion..." : "Connexion"}
+      {pending ? "Preparation..." : "Envoyer le lien"}
     </Button>
   );
 }
 
-const initialState: LoginActionState = {};
-
-export function LoginForm() {
-  const [state, formAction] = useActionState(authenticate, initialState);
+export function RequestPasswordResetForm() {
+  const [state, formAction] = useActionState(requestPasswordReset, initialState);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -40,33 +42,21 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium text-foreground">
-          Mot de passe
-        </label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          placeholder="••••••••"
-          required
-        />
-      </div>
-
-      <div className="flex justify-end">
-        <Link
-          href="/reset-password"
-          className="text-sm text-primary underline underline-offset-4"
-        >
-          Mot de passe oublie ?
-        </Link>
-      </div>
-
       {state.error ? (
         <p className="rounded-md border border-danger/20 bg-danger/8 px-3 py-2 text-sm text-danger">
           {state.error}
         </p>
+      ) : null}
+
+      {state.success ? (
+        <div className="space-y-3 rounded-md border border-success/20 bg-success/8 px-3 py-3 text-sm text-foreground">
+          <p>{state.success}</p>
+          {state.previewUrl ? (
+            <Link href={state.previewUrl} className="text-primary underline underline-offset-4">
+              Ouvrir le lien de reset
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
       <SubmitButton />
