@@ -63,7 +63,7 @@ export function AppSidebar({
                 className={cn(
                   "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "border-primary-deep bg-primary-deep text-[var(--primary-foreground)] shadow-sm"
+                    ? "border-primary-deep bg-primary-deep text-white shadow-sm hover:text-white [&_svg]:text-white"
                     : "border-transparent text-muted hover:border-border hover:bg-card hover:text-foreground",
                   collapsed && "justify-center px-0"
                 )}
@@ -111,7 +111,7 @@ export function AppSidebar({
                     className={cn(
                       "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
                       isActive
-                        ? "border-primary-deep bg-primary-deep text-[var(--primary-foreground)] shadow-sm"
+                        ? "border-primary-deep bg-primary-deep text-white shadow-sm hover:text-white [&_svg]:text-white"
                         : "border-transparent text-muted hover:border-border hover:bg-secondary hover:text-foreground"
                     )}
                   >
