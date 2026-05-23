@@ -6,3 +6,200 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model User {
+  id                       String            @id @default(cuid())
+  email                    String            @unique
+  passwordHash             String?
+  firstName                String
+  lastName                 String
+  role                     Role
+  status                   UserStatus        @default(invited)
+  isActive                 Boolean           @default(false)
+  emailVerifiedAt          DateTime?
+  lastLoginAt              DateTime?
+  serviceId                String?
+  service                  Service?          @relation("ServiceUsers", fields: [serviceId], references: [id], onDelete: SetNull)
+  managedService           Service?          @relation("ServiceManager")
+  invitationsSent          UserInvitation[]  @relation("InvitationSender")
+  requestedInterventions   Intervention[]    @relation("InterventionRequester")
+  assignedInterventions    Intervention[]    @relation("InterventionAssignee")
+  requestedPurchases       PurchaseRequest[] @relation("PurchaseRequester")
+  validatedPurchases       PurchaseRequest[] @relation("PurchaseValidator")
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  @@index([serviceId])
+  @@index([role])
+  @@index([status])
+}
+
+model Service {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  description      String?
+  isActive         Boolean           @default(true)
+  managerId        String?           @unique
+  manager          User?             @relation("ServiceManager", fields: [managerId], references: [id], onDelete: SetNull)
+  users            User[]            @relation("ServiceUsers")
+  interventions    Intervention[]
+  purchaseRequests PurchaseRequest[]
+  invitations      UserInvitation[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([isActive])
+}
+
+model UserInvitation {
+  id           String    @id @default(cuid())
+  email        String
+  firstName    String
+  lastName     String
+  tokenHash    String    @unique
+  role         Role
+  serviceId    String?
+  service      Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  invitedById  String
+  invitedBy    User      @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([email])
+  @@index([serviceId])
+  @@index([invitedById])
+  @@index([expiresAt])
+}
+
+model InterventionCategory {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  description   String?
+  isActive      Boolean        @default(true)
+  displayOrder  Int            @default(0)
+  interventions Intervention[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([isActive, displayOrder])
+}
+
+model InterventionStatus {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  description   String?
+  color         String?
+  isActive      Boolean        @default(true)
+  isFinal       Boolean        @default(false)
+  displayOrder  Int            @default(0)
+  interventions Intervention[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([isActive, displayOrder])
+}
+
+model Intervention {
+  id            String               @id @default(cuid())
+  ticketNumber  String               @unique
+  title         String
+  description   String
+  priority      Priority             @default(normale)
+  statusId      String
+  status        InterventionStatus   @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  categoryId    String?
+  category      InterventionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  serviceId     String?
+  service       Service?             @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  requesterId   String
+  requester     User                 @relation("InterventionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  assignedToId  String?
+  assignedTo    User?                @relation("InterventionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  closedAt      DateTime?
+
+  @@index([statusId])
+  @@index([categoryId])
+  @@index([serviceId])
+  @@index([requesterId])
+  @@index([assignedToId])
+  @@index([priority])
+}
+
+model PurchaseRequest {
+  id                String         @id @default(cuid())
+  requestNumber     String         @unique
+  title             String
+  description       String
+  quantity          Int?
+  estimatedBudget   Decimal?       @db.Decimal(12, 2)
+  supplier          String?
+  priority          Priority       @default(normale)
+  status            PurchaseStatus @default(brouillon)
+  requesterId       String
+  requester         User           @relation("PurchaseRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  serviceId         String?
+  service           Service?       @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  validatorId       String?
+  validator         User?          @relation("PurchaseValidator", fields: [validatorId], references: [id], onDelete: SetNull)
+  validationComment String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([requesterId])
+  @@index([serviceId])
+  @@index([validatorId])
+  @@index([status])
+  @@index([priority])
+}
+
+model NotificationLog {
+  id           String   @id @default(cuid())
+  event        String
+  recipient    String
+  subject      String
+  status       String
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([event])
+  @@index([recipient])
+  @@index([status])
+}
+
+enum Role {
+  admin
+  elu
+  responsable_service
+  agent
+  lecture
+}
+
+enum UserStatus {
+  invited
+  active
+  disabled
+}
+
+enum Priority {
+  basse
+  normale
+  haute
+  urgente
+}
+
+enum PurchaseStatus {
+  brouillon
+  soumise
+  en_validation
+  informations_demandees
+  validee
+  refusee
+  en_commande
+  receptionnee
+  cloturee
+}
