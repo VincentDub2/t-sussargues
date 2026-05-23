@@ -37,6 +37,14 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Services",
     description: "Administration des services et de leur activite.",
   },
+  "/admin/categories": {
+    title: "Categories d'intervention",
+    description: "Gestion des categories rattachees aux interventions.",
+  },
+  "/admin/statuses": {
+    title: "Statuts d'intervention",
+    description: "Gestion des statuts, de leur ordre et de leur activation.",
+  },
 };
 
 type AppTopbarProps = {

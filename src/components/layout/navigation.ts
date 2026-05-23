@@ -3,6 +3,9 @@ import {
   Boxes,
   ClipboardList,
   LayoutDashboard,
+  ListChecks,
+  Settings2,
+  Tags,
   Users2,
 } from "lucide-react";
 
@@ -26,6 +29,21 @@ export const appNavigation = [
     title: "Utilisateurs",
     href: "/admin/users",
     icon: Users2,
+  },
+  {
+    title: "Services",
+    href: "/admin/services",
+    icon: Settings2,
+  },
+  {
+    title: "Categories",
+    href: "/admin/categories",
+    icon: Tags,
+  },
+  {
+    title: "Statuts",
+    href: "/admin/statuses",
+    icon: ListChecks,
   },
 ] as const;
 
