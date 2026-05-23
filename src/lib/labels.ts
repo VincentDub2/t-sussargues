@@ -1,4 +1,4 @@
-import type { Role, UserStatus } from "@/generated/prisma/client";
+import type { Priority, Role, UserStatus } from "@/generated/prisma/client";
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrateur",
@@ -12,4 +12,11 @@ export const USER_STATUS_LABELS: Record<UserStatus, string> = {
   invited: "Invitation envoyee",
   active: "Actif",
   disabled: "Desactive",
+};
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  basse: "Basse",
+  normale: "Normale",
+  haute: "Haute",
+  urgente: "Urgente",
 };
