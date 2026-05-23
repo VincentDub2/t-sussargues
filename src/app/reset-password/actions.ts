@@ -29,7 +29,7 @@ export async function requestPasswordReset(
     return { error: "Veuillez renseigner votre email." };
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: { email },
     select: {
       id: true,
@@ -68,6 +68,10 @@ export async function requestPasswordReset(
       },
     });
   });
+
+  if (!user.email) {
+    return { success: GENERIC_SUCCESS_MESSAGE };
+  }
 
   const delivery = await sendPasswordResetEmail({
     email: user.email,

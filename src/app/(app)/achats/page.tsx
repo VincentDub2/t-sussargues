@@ -1,10 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { CreatePurchaseForm } from "@/components/purchases/create-purchase-form";
+import { CreatePurchaseDialog } from "@/components/purchases/create-purchase-dialog";
 import { PurchasesDataTable } from "@/components/purchases/purchases-data-table";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPurchaseVisibilityWhere, isPurchaseManagerRole } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
@@ -62,7 +60,7 @@ export default async function AchatsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
+      <section>
         <Card>
           <CardHeader>
             <p className="text-xs uppercase tracking-[0.24em] text-muted">Module metier</p>
@@ -90,30 +88,21 @@ export default async function AchatsPage() {
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Nouvelle demande</CardTitle>
-            <CardDescription>
-              Creez un brouillon, puis soumettez-le pour validation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CreatePurchaseForm
-              services={services}
-              defaultServiceId={session.user.serviceId}
-              canChooseService={canChooseService}
-            />
-          </CardContent>
-        </Card>
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Liste des demandes</CardTitle>
-          <CardDescription>
-            Les responsables voient les demandes de leur service, les autres voient leurs propres brouillons et soumissions.
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle>Liste des demandes</CardTitle>
+            <CardDescription>
+              Les responsables voient les demandes de leur service, les autres voient leurs propres brouillons et soumissions.
+            </CardDescription>
+          </div>
+          <CreatePurchaseDialog
+            services={services}
+            defaultServiceId={session.user.serviceId}
+            canChooseService={canChooseService}
+          />
         </CardHeader>
         <CardContent>
           <PurchasesDataTable

@@ -6,6 +6,8 @@ const prisma = createPrismaClient();
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@t-sussargues.local";
+  const adminUsername =
+    process.env.ADMIN_USERNAME ?? adminEmail.split("@")[0] ?? "admin";
   const adminFirstName = process.env.ADMIN_FIRST_NAME ?? "Admin";
   const adminLastName = process.env.ADMIN_LAST_NAME ?? "T-Sussargues";
   const adminPassword = process.env.ADMIN_PASSWORD ?? "Admin1234!";
@@ -67,6 +69,7 @@ async function main() {
     update: {
       firstName: adminFirstName,
       lastName: adminLastName,
+      username: adminUsername,
       role: Role.admin,
       status: UserStatus.active,
       isActive: true,
@@ -75,6 +78,7 @@ async function main() {
     },
     create: {
       email: adminEmail,
+      username: adminUsername,
       firstName: adminFirstName,
       lastName: adminLastName,
       role: Role.admin,

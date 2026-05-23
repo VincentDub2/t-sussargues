@@ -18,22 +18,25 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     Credentials({
       name: "Email / mot de passe",
       credentials: {
-        email: { label: "Email", type: "email" },
+        identifier: { label: "Email ou identifiant", type: "text" },
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email?.toString().trim().toLowerCase();
+        const identifier = credentials?.identifier?.toString().trim().toLowerCase();
         const password = credentials?.password?.toString();
 
-        if (!email || !password) {
+        if (!identifier || !password) {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [{ email: identifier }, { username: identifier }],
+          },
           select: {
             id: true,
             email: true,
+            username: true,
             firstName: true,
             lastName: true,
             passwordHash: true,
@@ -60,6 +63,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           name: `${user.firstName} ${user.lastName}`,
           firstName: user.firstName,
           lastName: user.lastName,
+          username: user.username,
           role: user.role,
           status: user.status,
           isActive: user.isActive,
@@ -76,6 +80,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         token.isActive = user.isActive;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
+        token.username = user.username;
         token.serviceId = user.serviceId;
       }
 
@@ -89,6 +94,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         session.user.isActive = Boolean(token.isActive);
         session.user.firstName = String(token.firstName ?? "");
         session.user.lastName = String(token.lastName ?? "");
+        session.user.username = String(token.username ?? "");
         session.user.serviceId =
           typeof token.serviceId === "string" ? token.serviceId : null;
         session.user.name =

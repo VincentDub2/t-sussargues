@@ -12,18 +12,18 @@ export async function authenticate(
   _previousState: LoginActionState,
   formData: FormData
 ): Promise<LoginActionState> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const identifier = String(formData.get("identifier") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) {
+  if (!identifier || !password) {
     return {
-      error: "Veuillez renseigner votre email et votre mot de passe.",
+      error: "Veuillez renseigner votre identifiant et votre mot de passe.",
     };
   }
 
   try {
     await signIn("credentials", {
-      email,
+      identifier,
       password,
       redirectTo: "/dashboard",
     });
@@ -31,7 +31,7 @@ export async function authenticate(
     if (error instanceof AuthError) {
       if (error.type === "CredentialsSignin") {
         return {
-          error: "Email ou mot de passe incorrect.",
+          error: "Identifiant ou mot de passe incorrect.",
         };
       }
 

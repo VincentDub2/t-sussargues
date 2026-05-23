@@ -29,7 +29,8 @@ type UserRecord = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
+  username: string;
   role: Role;
   status: UserStatus;
   isActive: boolean;
@@ -77,7 +78,8 @@ export function UsersDataTable({ currentUserId, services, users }: UsersDataTabl
 
     const haystack = [
       `${user.firstName} ${user.lastName}`,
-      user.email,
+      user.email ?? "",
+      user.username,
       ROLE_LABELS[user.role],
       USER_STATUS_LABELS[user.status],
       user.serviceName ?? "",
@@ -122,7 +124,7 @@ export function UsersDataTable({ currentUserId, services, users }: UsersDataTabl
     setSortKey(nextKey);
   }
 
-  function SortButton({ label, column }: { label: string; column: SortKey }) {
+  function renderSortButton(label: string, column: SortKey) {
     const isActive = sortKey === column;
 
     return (
@@ -148,7 +150,7 @@ export function UsersDataTable({ currentUserId, services, users }: UsersDataTabl
               setSearch(event.target.value);
               setPage(1);
             }}
-            placeholder="Rechercher un nom, email, role ou service"
+            placeholder="Rechercher un nom, identifiant, email, role ou service"
             className="pl-9"
           />
         </div>
@@ -192,16 +194,16 @@ export function UsersDataTable({ currentUserId, services, users }: UsersDataTabl
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>
-                <SortButton label="Utilisateur" column="name" />
+                {renderSortButton("Utilisateur", "name")}
               </TableHead>
               <TableHead>
-                <SortButton label="Role" column="role" />
+                {renderSortButton("Role", "role")}
               </TableHead>
               <TableHead>
-                <SortButton label="Service" column="service" />
+                {renderSortButton("Service", "service")}
               </TableHead>
               <TableHead>
-                <SortButton label="Statut" column="status" />
+                {renderSortButton("Statut", "status")}
               </TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Slot } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
@@ -44,7 +45,7 @@ export function Button({
   asChild = false,
   ...props
 }: ButtonProps) {
-  const Comp = asChild ? "span" : "button";
+  const Comp = asChild ? Slot.Root : "button";
 
   return (
     <Comp

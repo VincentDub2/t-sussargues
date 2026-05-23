@@ -29,15 +29,15 @@ export function LoginForm() {
   return (
     <form action={formAction} className="space-y-5">
       <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium text-foreground">
-          Email professionnel
+        <label htmlFor="identifier" className="text-sm font-medium text-foreground">
+          Email ou identifiant
         </label>
         <Input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="prenom.nom@exemple.fr"
+          id="identifier"
+          name="identifier"
+          type="text"
+          autoComplete="username"
+          placeholder="prenom.nom ou email"
           required
         />
       </div>

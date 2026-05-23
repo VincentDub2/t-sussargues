@@ -2,13 +2,23 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
 import { UsersDataTable } from "@/components/admin/users-data-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Role } from "@/generated/prisma/client";
 import { ROLE_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
+
+const invitationRoles: Role[] = [
+  "admin",
+  "elu",
+  "responsable_service",
+  "agent",
+  "lecture",
+];
 
 function getInvitationState(invitation: {
   acceptedAt: Date | null;
@@ -81,14 +91,10 @@ export default async function AdminUsersPage() {
         >
           Gerer les services
         </Link>
-        <Link
-          href="/admin/users/invite"
-          className={buttonVariants({
-            className: "w-full sm:w-auto text-primary-foreground hover:text-primary-foreground",
-          })}
-        >
-          Inviter un utilisateur
-        </Link>
+        <InviteUserDialog
+          roles={invitationRoles}
+          services={services.filter((service) => service.isActive)}
+        />
       </div>
 
       <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.9fr)]">
@@ -105,6 +111,7 @@ export default async function AdminUsersPage() {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                username: user.username,
                 role: user.role,
                 status: user.status,
                 isActive: user.isActive,

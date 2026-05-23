@@ -11,6 +11,7 @@ declare module "next-auth" {
       isActive: boolean;
       firstName: string;
       lastName: string;
+      username: string;
       serviceId: string | null;
     };
   }
@@ -21,6 +22,7 @@ declare module "next-auth" {
     isActive: boolean;
     firstName: string;
     lastName: string;
+    username: string;
     serviceId: string | null;
   }
 }
@@ -32,6 +34,7 @@ declare module "next-auth/jwt" {
     isActive?: boolean;
     firstName?: string;
     lastName?: string;
+    username?: string;
     serviceId?: string | null;
   }
 }

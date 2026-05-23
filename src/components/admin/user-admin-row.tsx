@@ -23,7 +23,8 @@ type UserAdminRowProps = {
     id: string;
     firstName: string;
     lastName: string;
-    email: string;
+    email: string | null;
+    username: string;
     role: Role;
     status: UserStatus;
     isActive: boolean;
@@ -85,7 +86,9 @@ export function UserAdminRow({ currentUserId, services, user }: UserAdminRowProp
               </p>
               {isCurrentUser ? <Badge className="shrink-0">Vous</Badge> : null}
             </div>
-            <p className="truncate text-sm text-muted">{user.email}</p>
+            <p className="truncate text-sm text-muted">
+              {user.email ?? `Identifiant: ${user.username}`}
+            </p>
           </div>
         </div>
       </TableCell>

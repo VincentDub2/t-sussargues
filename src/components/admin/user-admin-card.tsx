@@ -22,7 +22,8 @@ type UserAdminCardProps = {
     id: string;
     firstName: string;
     lastName: string;
-    email: string;
+    email: string | null;
+    username: string;
     role: Role;
     status: UserStatus;
     isActive: boolean;
@@ -85,7 +86,9 @@ export function UserAdminCard({ currentUserId, services, user }: UserAdminCardPr
               </Badge>
               {isCurrentUser ? <Badge className="shrink-0">Vous</Badge> : null}
             </div>
-            <p className="mt-1 text-sm text-muted">{user.email}</p>
+            <p className="mt-1 text-sm text-muted">
+              {user.email ?? `Identifiant: ${user.username}`}
+            </p>
             <p className="mt-1 text-sm text-muted">
               {ROLE_LABELS[user.role]}
               {user.serviceName ? ` · ${user.serviceName}` : ""}

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { CreateInterventionForm } from "@/components/interventions/create-intervention-form";
+import { CreateInterventionDialog } from "@/components/interventions/create-intervention-dialog";
 import { InterventionsDataTable } from "@/components/interventions/interventions-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getInterventionVisibilityWhere, isInterventionManagerRole } from "@/lib/interventions";
@@ -77,7 +77,7 @@ export default async function InterventionsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
+      <section>
         <Card>
           <CardHeader>
             <p className="text-xs uppercase tracking-[0.24em] text-muted">Module metier</p>
@@ -103,22 +103,6 @@ export default async function InterventionsPage() {
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Créer un ticket</CardTitle>
-            <CardDescription>
-              Toute personne connectee peut signaler une intervention et suivre son traitement.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CreateInterventionForm
-              categories={categories}
-              services={services}
-              hasActiveStatus={hasActiveStatus}
-            />
-          </CardContent>
-        </Card>
       </section>
 
       <section>
@@ -130,6 +114,11 @@ export default async function InterventionsPage() {
                 Suivi des tickets visibles selon votre role et votre service.
               </CardDescription>
             </div>
+            <CreateInterventionDialog
+              categories={categories}
+              services={services}
+              hasActiveStatus={hasActiveStatus}
+            />
           </CardHeader>
           <CardContent>
             <InterventionsDataTable

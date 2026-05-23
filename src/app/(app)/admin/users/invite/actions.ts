@@ -11,6 +11,7 @@ import {
   getInvitationUrl,
 } from "@/lib/invitations";
 import { sendInvitationEmail } from "@/lib/email";
+import { buildUsernameCandidate, normalizeUsername } from "@/lib/usernames";
 
 export type InvitationActionState = {
   error?: string;
@@ -28,6 +29,19 @@ const allowedRoles: Role[] = [
   "agent",
   "lecture",
 ];
+
+async function resolveAvailableUsername(candidate: string) {
+  const base = normalizeUsername(candidate) || "utilisateur";
+  let username = base;
+  let suffix = 2;
+
+  while (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
+    username = `${base}${suffix}`;
+    suffix += 1;
+  }
+
+  return username;
+}
 
 export async function createInvitation(
   _previousState: InvitationActionState,
@@ -54,6 +68,7 @@ export async function createInvitation(
     where: { email },
     select: {
       id: true,
+      username: true,
       status: true,
       isActive: true,
     },
@@ -72,6 +87,9 @@ export async function createInvitation(
   const { token, tokenHash } = generateInvitationToken();
   const invitationUrl = getInvitationUrl(token);
   const expiresAt = getInvitationExpiryDate();
+  const username =
+    existingUser?.username ??
+    (await resolveAvailableUsername(buildUsernameCandidate({ firstName, lastName, email })));
 
   await prisma.$transaction(async (tx) => {
     await tx.userInvitation.updateMany({
@@ -90,6 +108,7 @@ export async function createInvitation(
       update: {
         firstName,
         lastName,
+        username,
         role,
         status: "invited",
         isActive: false,
@@ -98,6 +117,7 @@ export async function createInvitation(
       },
       create: {
         email,
+        username,
         firstName,
         lastName,
         role,

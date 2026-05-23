@@ -28,6 +28,7 @@ export default async function ResetPasswordPage({
       user: {
         select: {
           email: true,
+          username: true,
           firstName: true,
           lastName: true,
         },
@@ -59,7 +60,9 @@ export default async function ResetPasswordPage({
                   <p className="font-medium">
                     {resetToken.user.firstName} {resetToken.user.lastName}
                   </p>
-                  <p className="mt-1 text-muted">{resetToken.user.email}</p>
+                  <p className="mt-1 text-muted">
+                    {resetToken.user.email ?? resetToken.user.username}
+                  </p>
                 </div>
                 <ResetPasswordForm token={token} />
               </>
