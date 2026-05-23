@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   ListChecks,
+  Mail,
   Settings2,
   Tags,
   Users2,
@@ -44,6 +45,11 @@ export const appNavigation = [
     title: "Statuts",
     href: "/admin/statuses",
     icon: ListChecks,
+  },
+  {
+    title: "Notifications",
+    href: "/admin/notifications",
+    icon: Mail,
   },
 ] as const;
 

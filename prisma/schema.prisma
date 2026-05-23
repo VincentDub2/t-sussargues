@@ -220,6 +220,44 @@ model NotificationLog {
   @@index([status])
 }
 
+model NotificationEvent {
+  id          String                  @id @default(cuid())
+  key         String                  @unique
+  label       String
+  description String
+  isActive    Boolean                 @default(true)
+  template    NotificationTemplate?
+  recipients  NotificationRecipient[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([isActive])
+}
+
+model NotificationTemplate {
+  id        String            @id @default(cuid())
+  eventId   String            @unique
+  event     NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  subject   String
+  bodyText  String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model NotificationRecipient {
+  id        String            @id @default(cuid())
+  eventId   String
+  event     NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label     String?
+  email     String
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([eventId, isActive])
+  @@index([email])
+}
+
 enum Role {
   admin
   elu
