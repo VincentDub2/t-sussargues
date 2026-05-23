@@ -1,3 +1,4 @@
+import { hashPassword } from "../src/lib/password";
 import { Role, UserStatus } from "../src/generated/prisma/client";
 import { createPrismaClient } from "../src/lib/prisma";
 
@@ -7,7 +8,9 @@ async function main() {
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@t-sussargues.local";
   const adminFirstName = process.env.ADMIN_FIRST_NAME ?? "Admin";
   const adminLastName = process.env.ADMIN_LAST_NAME ?? "T-Sussargues";
+  const adminPassword = process.env.ADMIN_PASSWORD ?? "Admin1234!";
   const serviceName = "Administration";
+  const adminPasswordHash = await hashPassword(adminPassword);
 
   const service = await prisma.service.upsert({
     where: { name: serviceName },
@@ -27,6 +30,7 @@ async function main() {
       role: Role.admin,
       status: UserStatus.active,
       isActive: true,
+      passwordHash: adminPasswordHash,
       serviceId: service.id,
     },
     create: {
@@ -36,6 +40,7 @@ async function main() {
       role: Role.admin,
       status: UserStatus.active,
       isActive: true,
+      passwordHash: adminPasswordHash,
       serviceId: service.id,
     },
   });
