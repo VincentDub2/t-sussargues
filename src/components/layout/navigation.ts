@@ -1,9 +1,11 @@
 import {
+  AlertTriangle,
   BellRing,
   Boxes,
   ClipboardList,
   LayoutDashboard,
   ListChecks,
+  ShoppingCart,
   Mail,
   Settings2,
   Tags,
@@ -73,7 +75,7 @@ export function getNavigationForRole(role: Role) {
 }
 
 export const topbarHighlights = [
-  { label: "Urgences", value: "3" },
-  { label: "Achats", value: "5" },
+  { label: "Urgences", value: "3", icon: AlertTriangle },
+  { label: "Achats", value: "5", icon: ShoppingCart },
   { label: "Alertes", value: "2", icon: BellRing },
 ] as const;

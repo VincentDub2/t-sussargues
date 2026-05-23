@@ -126,13 +126,21 @@ export function AppTopbar({ onOpenMobileNav, onSignOut, user }: AppTopbarProps) 
 
         <div className="flex flex-wrap items-center gap-2">
           {topbarHighlights.map((item) => (
-            <Badge key={item.label} variant="outline" className="gap-2 px-3 py-1.5">
-              {"icon" in item && item.icon ? <item.icon className="size-3.5" /> : null}
-              <span>{item.label}</span>
-              <span className="font-semibold text-foreground">
+            <div
+              key={item.label}
+              className="inline-flex items-center gap-2 rounded-full bg-card px-2.5 py-1.5 shadow-sm shadow-black/5"
+            >
+              <div className="flex size-6 items-center justify-center rounded-full">
+                {"icon" in item && item.icon ? <item.icon className="size-3.5 bg-card" /> : null}
+              </div>
+              <span className="text-xs font-medium text-muted">{item.label}</span>
+              <Badge
+                variant="secondary"
+                className="min-w-6 bg-card justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none"
+              >
                 {item.value}
-              </span>
-            </Badge>
+              </Badge>
+            </div>
           ))}
         </div>
       </div>

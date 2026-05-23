@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { UserAdminCard } from "@/components/admin/user-admin-card";
+import { UsersDataTable } from "@/components/admin/users-data-table";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -84,7 +84,7 @@ export default async function AdminUsersPage() {
         <Link
           href="/admin/users/invite"
           className={buttonVariants({
-            className: "w-full sm:w-auto !text-white font-bold",
+            className: "w-full sm:w-auto text-primary-foreground hover:text-primary-foreground",
           })}
         >
           Inviter un utilisateur
@@ -96,25 +96,22 @@ export default async function AdminUsersPage() {
           <CardHeader>
             <CardTitle>Annuaire interne</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {users.map((user) => (
-              <UserAdminCard
-                key={user.id}
-                currentUserId={session.user.id}
-                services={services}
-                user={{
-                  id: user.id,
-                  firstName: user.firstName,
-                  lastName: user.lastName,
-                  email: user.email,
-                  role: user.role,
-                  status: user.status,
-                  isActive: user.isActive,
-                  serviceId: user.serviceId,
-                  serviceName: user.service?.name ?? null,
-                }}
-              />
-            ))}
+          <CardContent>
+            <UsersDataTable
+              currentUserId={session.user.id}
+              services={services}
+              users={users.map((user) => ({
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                role: user.role,
+                status: user.status,
+                isActive: user.isActive,
+                serviceId: user.serviceId,
+                serviceName: user.service?.name ?? null,
+              }))}
+            />
           </CardContent>
         </Card>
 

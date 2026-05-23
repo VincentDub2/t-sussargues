@@ -15,7 +15,7 @@ const initialState: AdminServiceActionState = {};
 function SubmitButton() {
   const { pending } = useFormStatus();
 
-  return <Button disabled={pending}>{pending ? "Creation..." : "Creer le service"}</Button>;
+  return <Button variant="default" disabled={pending}>{pending ? "Creation..." : "Creer le service"}</Button>;
 }
 
 export function CreateServiceForm() {

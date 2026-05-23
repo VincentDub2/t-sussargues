@@ -1,63 +1,26 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { CreateInterventionForm } from "@/components/interventions/create-intervention-form";
-import { InterventionStatusBadge } from "@/components/interventions/intervention-status-badge";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { InterventionsDataTable } from "@/components/interventions/interventions-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { SelectField } from "@/components/ui/select-field";
-import type { Priority, Prisma } from "@/generated/prisma/client";
-import { getInterventionVisibilityWhere, isInterventionManagerRole, isPriority } from "@/lib/interventions";
-import { PRIORITY_LABELS } from "@/lib/labels";
+import { getInterventionVisibilityWhere, isInterventionManagerRole } from "@/lib/interventions";
 import { prisma } from "@/lib/prisma";
 
-type InterventionsPageProps = {
-  searchParams?: Promise<{
-    statusId?: string;
-    priority?: string;
-    serviceId?: string;
-  }>;
-};
-
-const priorities: Priority[] = ["basse", "normale", "haute", "urgente"];
-
-function getSingleValue(value: string | undefined) {
-  return value?.trim() ? value.trim() : "";
-}
-
-export default async function InterventionsPage({
-  searchParams,
-}: InterventionsPageProps) {
+export default async function InterventionsPage() {
   const session = await auth();
 
   if (!session?.user) {
     redirect("/login");
   }
 
-  const params = (await searchParams) ?? {};
-  const selectedStatusId = getSingleValue(params.statusId);
-  const selectedServiceId = getSingleValue(params.serviceId);
-  const selectedPriority = isPriority(params.priority) ? params.priority : "";
-
-  const where: Prisma.InterventionWhereInput = {
-    AND: [
-      getInterventionVisibilityWhere({
+  const [interventions, statuses, categories, services, assignedCount] = await Promise.all([
+    prisma.intervention.findMany({
+      where: getInterventionVisibilityWhere({
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
       }),
-      selectedStatusId ? { statusId: selectedStatusId } : {},
-      selectedPriority ? { priority: selectedPriority } : {},
-      selectedServiceId ? { serviceId: selectedServiceId } : {},
-    ],
-  };
-
-  const [interventions, statuses, categories, services, assignedCount] = await Promise.all([
-    prisma.intervention.findMany({
-      where,
       orderBy: [{ createdAt: "desc" }],
       include: {
         status: true,
@@ -158,74 +121,7 @@ export default async function InterventionsPage({
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtres</CardTitle>
-            <CardDescription>Affinez la liste par statut, priorite et service.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" method="get">
-              <div className="space-y-2">
-                <label htmlFor="statusId" className="text-sm font-medium text-foreground">
-                  Statut
-                </label>
-                <SelectField id="statusId" name="statusId" defaultValue={selectedStatusId}>
-                  <option value="">Tous les statuts</option>
-                  {statuses.map((status) => (
-                    <option key={status.id} value={status.id}>
-                      {status.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="priority" className="text-sm font-medium text-foreground">
-                  Priorite
-                </label>
-                <SelectField id="priority" name="priority" defaultValue={selectedPriority}>
-                  <option value="">Toutes les priorites</option>
-                  {priorities.map((priority) => (
-                    <option key={priority} value={priority}>
-                      {PRIORITY_LABELS[priority]}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="serviceId" className="text-sm font-medium text-foreground">
-                  Service
-                </label>
-                <SelectField id="serviceId" name="serviceId" defaultValue={selectedServiceId}>
-                  <option value="">Tous les services</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <button className={buttonVariants({ className: "w-full sm:w-auto" })} type="submit">
-                  Appliquer
-                </button>
-                <Link
-                  href="/interventions"
-                  className={buttonVariants({
-                    variant: "outline",
-                    className: "w-full sm:w-auto",
-                  })}
-                >
-                  Reinitialiser
-                </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
+      <section>
         <Card>
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -234,83 +130,27 @@ export default async function InterventionsPage({
                 Suivi des tickets visibles selon votre role et votre service.
               </CardDescription>
             </div>
-            <div className="w-full sm:max-w-xs">
-              <Input value={`${interventions.length} resultat(s)`} readOnly />
-            </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {interventions.length > 0 ? (
-              interventions.map((intervention) => (
-                <div
-                  key={intervention.id}
-                  className="rounded-lg border border-border p-4 transition-colors hover:bg-secondary"
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/interventions/${intervention.id}`}
-                          className="font-semibold text-foreground underline-offset-4 hover:underline"
-                        >
-                          {intervention.ticketNumber}
-                        </Link>
-                        <Badge variant="outline">{PRIORITY_LABELS[intervention.priority]}</Badge>
-                        <InterventionStatusBadge
-                          label={intervention.status.name}
-                          color={intervention.status.color}
-                        />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{intervention.title}</p>
-                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">
-                          {intervention.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Link
-                      href={`/interventions/${intervention.id}`}
-                      className={buttonVariants({ variant: "outline", className: "w-full sm:w-auto" })}
-                    >
-                      Voir le detail
-                    </Link>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 text-sm text-muted sm:grid-cols-2 xl:grid-cols-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em]">Demandeur</p>
-                      <p className="mt-1 text-foreground">
-                        {intervention.requester.firstName} {intervention.requester.lastName}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em]">Service</p>
-                      <p className="mt-1 text-foreground">
-                        {intervention.service?.name ?? "Sans service"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em]">Categorie</p>
-                      <p className="mt-1 text-foreground">
-                        {intervention.category?.name ?? "Non renseignee"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em]">Affectation</p>
-                      <p className="mt-1 text-foreground">
-                        {intervention.assignedTo
-                          ? `${intervention.assignedTo.firstName} ${intervention.assignedTo.lastName}`
-                          : "Aucune"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-lg border border-dashed border-border bg-secondary p-6 text-sm text-muted">
-                Aucune intervention ne correspond a ces filtres pour le moment.
-              </div>
-            )}
+          <CardContent>
+            <InterventionsDataTable
+              interventions={interventions.map((intervention) => ({
+                id: intervention.id,
+                ticketNumber: intervention.ticketNumber,
+                title: intervention.title,
+                description: intervention.description,
+                priority: intervention.priority,
+                statusId: intervention.statusId,
+                statusLabel: intervention.status.name,
+                statusColor: intervention.status.color,
+                requesterName: `${intervention.requester.firstName} ${intervention.requester.lastName}`,
+                serviceId: intervention.serviceId,
+                serviceName: intervention.service?.name ?? null,
+                categoryName: intervention.category?.name ?? null,
+                assignedToName: intervention.assignedTo
+                  ? `${intervention.assignedTo.firstName} ${intervention.assignedTo.lastName}`
+                  : null,
+              }))}
+            />
           </CardContent>
         </Card>
       </section>

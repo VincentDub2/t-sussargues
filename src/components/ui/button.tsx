@@ -9,7 +9,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary font-bold !text-white hover:bg-primary-deep hover:!text-white visited:!text-white [&_svg]:!text-white",
+          "bg-primary font-bold text-primary-foreground hover:bg-primary-deep hover:text-primary-foreground [&_svg]:text-primary-foreground",
         secondary:
           "bg-secondary text-foreground hover:bg-sand",
         outline:
@@ -49,7 +49,7 @@ export function Button({
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   );

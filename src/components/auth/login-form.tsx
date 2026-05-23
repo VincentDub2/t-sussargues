@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { LoginActionState } from "@/app/login/actions";
 import { authenticate } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -23,6 +24,7 @@ const initialState: LoginActionState = {};
 
 export function LoginForm() {
   const [state, formAction] = useActionState(authenticate, initialState);
+  const [password, setPassword] = useState("");
 
   return (
     <form action={formAction} className="space-y-5">
@@ -44,12 +46,13 @@ export function LoginForm() {
         <label htmlFor="password" className="text-sm font-medium text-foreground">
           Mot de passe
         </label>
-        <Input
+        <PasswordField
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           placeholder="••••••••"
+          value={password}
+          onChange={setPassword}
           required
         />
       </div>

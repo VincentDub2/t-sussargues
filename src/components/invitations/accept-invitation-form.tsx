@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { AcceptInvitationActionState } from "@/app/invitation/[token]/actions";
 import { acceptInvitation } from "@/app/invitation/[token]/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordField } from "@/components/ui/password-field";
 
 type AcceptInvitationFormProps = {
   token: string;
@@ -24,6 +24,8 @@ const initialState: AcceptInvitationActionState = {};
 export function AcceptInvitationForm({ token }: AcceptInvitationFormProps) {
   const action = acceptInvitation.bind(null, token);
   const [state, formAction] = useActionState(action, initialState);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   if (state.success) {
     return (
@@ -44,12 +46,13 @@ export function AcceptInvitationForm({ token }: AcceptInvitationFormProps) {
         <label htmlFor="password" className="text-sm font-medium text-foreground">
           Mot de passe
         </label>
-        <Input
+        <PasswordField
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           placeholder="Au moins 8 caracteres"
+          value={password}
+          onChange={setPassword}
           required
         />
       </div>
@@ -61,12 +64,15 @@ export function AcceptInvitationForm({ token }: AcceptInvitationFormProps) {
         >
           Confirmation du mot de passe
         </label>
-        <Input
+        <PasswordField
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           placeholder="Confirmez votre mot de passe"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          compareWith={password}
+          compareLabel="Confirmation"
           required
         />
       </div>
