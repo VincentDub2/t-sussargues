@@ -14,6 +14,9 @@ const requiredDelegates = [
   "purchaseRequest",
   "purchaseRequestHistory",
   "notificationLog",
+  "notificationEvent",
+  "notificationTemplate",
+  "notificationRecipient",
 ] as const;
 
 function getDatabaseUrl() {

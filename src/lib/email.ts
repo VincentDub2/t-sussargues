@@ -1,19 +1,29 @@
 import nodemailer from "nodemailer";
 
+import {
+  buildCommentBlock,
+  ensureNotificationCatalog,
+  getNotificationTestVariables,
+  renderNotificationContent,
+  type NotificationEventKey,
+  type NotificationVariableMap,
+} from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
-type EmailDeliveryResult =
+export type EmailDeliveryResult =
   | { status: "sent" }
   | { status: "dev_preview"; previewUrl?: string }
-  | { status: "failed"; errorMessage: string };
+  | { status: "failed"; errorMessage: string }
+  | { status: "disabled" }
+  | { status: "skipped_no_recipient" };
 
-type SendAppEmailInput = {
-  event: string;
-  recipient: string;
-  subject: string;
-  text: string;
+type SendConfiguredEmailInput = {
+  eventKey: NotificationEventKey;
+  primaryRecipients?: string[];
+  variables: NotificationVariableMap;
   previewUrl?: string;
   previewText?: string;
+  forceSend?: boolean;
 };
 
 type InvitationEmailInput = {
@@ -76,8 +86,7 @@ function isTruthyEnvFlag(value: string | undefined) {
 
 function getTransporter() {
   const port = Number(process.env.SMTP_PORT ?? "587");
-  const secure =
-    isTruthyEnvFlag(process.env.SMTP_SECURE) || port === 465;
+  const secure = isTruthyEnvFlag(process.env.SMTP_SECURE) || port === 465;
 
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -92,40 +101,150 @@ function getTransporter() {
   });
 }
 
-async function logEmailDelivery(
-  input: SendAppEmailInput,
-  result: EmailDeliveryResult
-) {
+async function logEmailDelivery({
+  event,
+  recipient,
+  subject,
+  result,
+  previewText,
+  previewUrl,
+}: {
+  event: string;
+  recipient: string;
+  subject: string;
+  result: EmailDeliveryResult;
+  previewText?: string;
+  previewUrl?: string;
+}) {
   const errorMessage =
     result.status === "dev_preview"
-      ? result.previewUrl
-        ? `Preview URL: ${result.previewUrl}`
-        : input.previewText ?? "Dev preview only."
+      ? previewUrl
+        ? `Preview URL: ${previewUrl}`
+        : previewText ?? "Dev preview only."
       : result.status === "failed"
         ? result.errorMessage
-        : null;
+        : result.status === "disabled"
+          ? "Notification desactivee par configuration."
+          : result.status === "skipped_no_recipient"
+            ? "Aucun destinataire actif pour cette notification."
+            : null;
 
   await prisma.notificationLog.create({
     data: {
-      event: input.event,
-      recipient: input.recipient,
-      subject: input.subject,
+      event,
+      recipient,
+      subject,
       status: result.status,
       errorMessage,
     },
   });
 }
 
-async function sendAppEmail(
-  input: SendAppEmailInput
-): Promise<EmailDeliveryResult> {
-  if (!isSmtpConfigured()) {
+function dedupeRecipients(emails: string[]) {
+  return Array.from(
+    new Set(
+      emails
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+}
+
+async function sendConfiguredEmail({
+  eventKey,
+  primaryRecipients = [],
+  variables,
+  previewUrl,
+  previewText,
+  forceSend = false,
+}: SendConfiguredEmailInput): Promise<EmailDeliveryResult> {
+  await ensureNotificationCatalog();
+
+  const event = await prisma.notificationEvent.findUnique({
+    where: { key: eventKey },
+    include: {
+      template: true,
+      recipients: {
+        where: { isActive: true },
+        orderBy: [{ createdAt: "asc" }],
+      },
+    },
+  });
+
+  if (!event?.template) {
     const result: EmailDeliveryResult = {
-      status: "dev_preview",
-      previewUrl: input.previewUrl,
+      status: "failed",
+      errorMessage: "Configuration de notification introuvable.",
     };
 
-    await logEmailDelivery(input, result);
+    await logEmailDelivery({
+      event: eventKey,
+      recipient: primaryRecipients[0] ?? "aucun-destinataire",
+      subject: "(configuration manquante)",
+      result,
+      previewText,
+      previewUrl,
+    });
+
+    return result;
+  }
+
+  const subject = renderNotificationContent(event.template.subject, variables).trim();
+  const bodyText = renderNotificationContent(event.template.bodyText, variables).trim();
+
+  if (!event.isActive && !forceSend) {
+    const result: EmailDeliveryResult = { status: "disabled" };
+
+    await logEmailDelivery({
+      event: event.key,
+      recipient: primaryRecipients[0] ?? "notification-desactivee",
+      subject,
+      result,
+      previewText,
+      previewUrl,
+    });
+
+    return result;
+  }
+
+  const recipients = forceSend
+    ? dedupeRecipients(primaryRecipients)
+    : dedupeRecipients([
+        ...primaryRecipients,
+        ...event.recipients.map((recipient) => recipient.email),
+      ]);
+
+  if (recipients.length === 0) {
+    const result: EmailDeliveryResult = { status: "skipped_no_recipient" };
+
+    await logEmailDelivery({
+      event: event.key,
+      recipient: "aucun-destinataire",
+      subject,
+      result,
+      previewText,
+      previewUrl,
+    });
+
+    return result;
+  }
+
+  if (!isSmtpConfigured()) {
+    const result: EmailDeliveryResult = { status: "dev_preview", previewUrl };
+
+    await Promise.all(
+      recipients.map((recipient) =>
+        logEmailDelivery({
+          event: event.key,
+          recipient,
+          subject,
+          result,
+          previewText,
+          previewUrl,
+        })
+      )
+    );
+
     return result;
   }
 
@@ -134,13 +253,26 @@ async function sendAppEmail(
 
     await transporter.sendMail({
       from: process.env.SMTP_USER,
-      to: input.recipient,
-      subject: input.subject,
-      text: input.text,
+      to: recipients.join(", "),
+      subject,
+      text: bodyText,
     });
 
     const result: EmailDeliveryResult = { status: "sent" };
-    await logEmailDelivery(input, result);
+
+    await Promise.all(
+      recipients.map((recipient) =>
+        logEmailDelivery({
+          event: event.key,
+          recipient,
+          subject,
+          result,
+          previewText,
+          previewUrl,
+        })
+      )
+    );
+
     return result;
   } catch (error) {
     const result: EmailDeliveryResult = {
@@ -149,202 +281,126 @@ async function sendAppEmail(
         error instanceof Error ? error.message : "Envoi de l'email impossible.",
     };
 
-    await logEmailDelivery(input, result);
+    await Promise.all(
+      recipients.map((recipient) =>
+        logEmailDelivery({
+          event: event.key,
+          recipient,
+          subject,
+          result,
+          previewText,
+          previewUrl,
+        })
+      )
+    );
+
     return result;
   }
 }
 
-function getInvitationSubject() {
-  return "Invitation a rejoindre l'application T-Sussargues";
-}
-
-function getInvitationText({
-  firstName,
-  invitationUrl,
-  invitedByName,
-}: InvitationEmailInput) {
-  return [
-    `Bonjour ${firstName},`,
-    "",
-    `${invitedByName} vous a invite a rejoindre l'application T-Sussargues.`,
-    "",
-    "Cliquez sur le lien suivant pour definir votre mot de passe :",
-    invitationUrl,
-    "",
-    "Ce lien expire dans 7 jours.",
-  ].join("\n");
+export async function sendTestNotificationEmail(
+  eventKey: NotificationEventKey,
+  email: string
+) {
+  return sendConfiguredEmail({
+    eventKey,
+    primaryRecipients: [email],
+    variables: getNotificationTestVariables(eventKey),
+    previewText: `Email de test ${eventKey}`,
+    forceSend: true,
+  });
 }
 
 export async function sendInvitationEmail(input: InvitationEmailInput) {
-  return sendAppEmail({
-    event: "user_invitation",
-    recipient: input.email,
-    subject: getInvitationSubject(),
-    text: getInvitationText(input),
+  return sendConfiguredEmail({
+    eventKey: "user_invitation",
+    primaryRecipients: [input.email],
+    variables: {
+      firstName: input.firstName,
+      invitedByName: input.invitedByName,
+      invitationUrl: input.invitationUrl,
+    },
     previewUrl: input.invitationUrl,
     previewText: `Invitation: ${input.invitationUrl}`,
   });
 }
 
-function getPasswordResetSubject() {
-  return "Reinitialisation de votre mot de passe T-Sussargues";
-}
-
-function getPasswordResetText({
-  firstName,
-  resetUrl,
-}: PasswordResetEmailInput) {
-  return [
-    `Bonjour ${firstName},`,
-    "",
-    "Une demande de reinitialisation de mot de passe a ete effectuee pour votre compte T-Sussargues.",
-    "",
-    "Cliquez sur le lien suivant pour definir un nouveau mot de passe :",
-    resetUrl,
-    "",
-    "Ce lien expire dans 2 heures.",
-    "Si vous n'etes pas a l'origine de cette demande, vous pouvez ignorer cet email.",
-  ].join("\n");
-}
-
 export async function sendPasswordResetEmail(input: PasswordResetEmailInput) {
-  return sendAppEmail({
-    event: "password_reset",
-    recipient: input.email,
-    subject: getPasswordResetSubject(),
-    text: getPasswordResetText(input),
+  return sendConfiguredEmail({
+    eventKey: "password_reset",
+    primaryRecipients: [input.email],
+    variables: {
+      firstName: input.firstName,
+      resetUrl: input.resetUrl,
+    },
     previewUrl: input.resetUrl,
     previewText: `Reset: ${input.resetUrl}`,
   });
 }
 
-function getInterventionCreatedSubject(ticketNumber: string) {
-  return `Intervention creee - ${ticketNumber}`;
-}
-
-function getInterventionCreatedText({
-  firstName,
-  ticketNumber,
-  title,
-}: InterventionCreatedEmailInput) {
-  return [
-    `Bonjour ${firstName},`,
-    "",
-    `Votre intervention ${ticketNumber} a bien ete creee.`,
-    `Objet: ${title}`,
-    "",
-    "Vous pourrez suivre son avancement dans l'application T-Sussargues.",
-  ].join("\n");
-}
-
 export async function sendInterventionCreatedEmail(
   input: InterventionCreatedEmailInput
 ) {
-  return sendAppEmail({
-    event: "intervention_created",
-    recipient: input.email,
-    subject: getInterventionCreatedSubject(input.ticketNumber),
-    text: getInterventionCreatedText(input),
+  return sendConfiguredEmail({
+    eventKey: "intervention_created",
+    primaryRecipients: [input.email],
+    variables: {
+      firstName: input.firstName,
+      ticketNumber: input.ticketNumber,
+      title: input.title,
+    },
     previewText: `Intervention ${input.ticketNumber} creee`,
   });
-}
-
-function getInterventionAssignedSubject(ticketNumber: string) {
-  return `Intervention assignee - ${ticketNumber}`;
-}
-
-function getInterventionAssignedText({
-  firstName,
-  ticketNumber,
-  title,
-  assignedByName,
-}: InterventionAssignedEmailInput) {
-  return [
-    `Bonjour ${firstName},`,
-    "",
-    `${assignedByName} vous a assigne l'intervention ${ticketNumber}.`,
-    `Objet: ${title}`,
-    "",
-    "Merci de consulter le detail dans l'application T-Sussargues.",
-  ].join("\n");
 }
 
 export async function sendInterventionAssignedEmail(
   input: InterventionAssignedEmailInput
 ) {
-  return sendAppEmail({
-    event: "intervention_assigned",
-    recipient: input.email,
-    subject: getInterventionAssignedSubject(input.ticketNumber),
-    text: getInterventionAssignedText(input),
+  return sendConfiguredEmail({
+    eventKey: "intervention_assigned",
+    primaryRecipients: [input.email],
+    variables: {
+      firstName: input.firstName,
+      ticketNumber: input.ticketNumber,
+      title: input.title,
+      assignedByName: input.assignedByName,
+    },
     previewText: `Intervention ${input.ticketNumber} assignee`,
   });
-}
-
-function getPurchaseValidatedSubject(requestNumber: string) {
-  return `Demande d'achat validee - ${requestNumber}`;
-}
-
-function getPurchaseValidatedText({
-  firstName,
-  requestNumber,
-  title,
-  decidedByName,
-  comment,
-}: PurchaseDecisionEmailInput) {
-  return [
-    `Bonjour ${firstName},`,
-    "",
-    `${decidedByName} a valide votre demande d'achat ${requestNumber}.`,
-    `Objet: ${title}`,
-    ...(comment ? ["", `Commentaire: ${comment}`] : []),
-    "",
-    "Vous pouvez consulter le detail dans l'application T-Sussargues.",
-  ].join("\n");
 }
 
 export async function sendPurchaseValidatedEmail(
   input: PurchaseDecisionEmailInput
 ) {
-  return sendAppEmail({
-    event: "purchase_validated",
-    recipient: input.email,
-    subject: getPurchaseValidatedSubject(input.requestNumber),
-    text: getPurchaseValidatedText(input),
+  return sendConfiguredEmail({
+    eventKey: "purchase_validated",
+    primaryRecipients: [input.email],
+    variables: {
+      firstName: input.firstName,
+      requestNumber: input.requestNumber,
+      title: input.title,
+      decidedByName: input.decidedByName,
+      comment: input.comment ?? "",
+      commentBlock: buildCommentBlock(input.comment),
+    },
     previewText: `Achat ${input.requestNumber} valide`,
   });
-}
-
-function getPurchaseRejectedSubject(requestNumber: string) {
-  return `Demande d'achat refusee - ${requestNumber}`;
-}
-
-function getPurchaseRejectedText({
-  firstName,
-  requestNumber,
-  title,
-  decidedByName,
-  comment,
-}: PurchaseDecisionEmailInput) {
-  return [
-    `Bonjour ${firstName},`,
-    "",
-    `${decidedByName} a refuse votre demande d'achat ${requestNumber}.`,
-    `Objet: ${title}`,
-    ...(comment ? ["", `Commentaire: ${comment}`] : []),
-    "",
-    "Vous pouvez consulter le detail dans l'application T-Sussargues.",
-  ].join("\n");
 }
 
 export async function sendPurchaseRejectedEmail(
   input: PurchaseDecisionEmailInput
 ) {
-  return sendAppEmail({
-    event: "purchase_rejected",
-    recipient: input.email,
-    subject: getPurchaseRejectedSubject(input.requestNumber),
-    text: getPurchaseRejectedText(input),
+  return sendConfiguredEmail({
+    eventKey: "purchase_rejected",
+    primaryRecipients: [input.email],
+    variables: {
+      firstName: input.firstName,
+      requestNumber: input.requestNumber,
+      title: input.title,
+      decidedByName: input.decidedByName,
+      comment: input.comment ?? "",
+      commentBlock: buildCommentBlock(input.comment),
+    },
     previewText: `Achat ${input.requestNumber} refuse`,
   });
 }

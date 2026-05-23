@@ -45,6 +45,10 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Statuts d'intervention",
     description: "Gestion des statuts, de leur ordre et de leur activation.",
   },
+  "/admin/notifications": {
+    title: "Notifications",
+    description: "Configuration des emails automatiques, de leurs templates et des tests d'envoi.",
+  },
 };
 
 type AppTopbarProps = {

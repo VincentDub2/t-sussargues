@@ -108,6 +108,14 @@ export function InviteUserForm({ roles, services }: InviteUserFormProps) {
                 {state.previewUrl}
               </a>
             </div>
+          ) : state.deliveryStatus === "disabled" ? (
+            <p className="text-muted">
+              L&apos;invitation a ete creee, mais l&apos;evenement d&apos;email est desactive dans la configuration des notifications.
+            </p>
+          ) : state.deliveryStatus === "skipped_no_recipient" ? (
+            <p className="text-muted">
+              L&apos;invitation a ete creee, mais aucun destinataire actif n&apos;a pu etre determine pour l&apos;email.
+            </p>
           ) : (
             <p className="text-muted">Email d&apos;invitation envoye.</p>
           )}

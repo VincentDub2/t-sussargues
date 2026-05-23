@@ -18,7 +18,7 @@ export type InvitationActionState = {
   success?: boolean;
   email?: string;
   previewUrl?: string;
-  deliveryStatus?: "sent" | "dev_preview";
+  deliveryStatus?: "sent" | "dev_preview" | "disabled" | "skipped_no_recipient";
 };
 
 const allowedRoles: Role[] = [
