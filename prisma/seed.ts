@@ -11,6 +11,46 @@ async function main() {
   const adminPassword = process.env.ADMIN_PASSWORD ?? "Admin1234!";
   const serviceName = "Administration";
   const adminPasswordHash = await hashPassword(adminPassword);
+  const defaultCategories = [
+    {
+      name: "Batiment",
+      description: "Demandes liees aux batiments et locaux municipaux.",
+      displayOrder: 10,
+    },
+    {
+      name: "Electricite",
+      description: "Signalements electriques et depannages associes.",
+      displayOrder: 20,
+    },
+    {
+      name: "Voirie",
+      description: "Travaux, degradations et interventions sur l'espace public.",
+      displayOrder: 30,
+    },
+  ];
+  const defaultStatuses = [
+    {
+      name: "Nouveau",
+      description: "Ticket cree en attente de prise en charge.",
+      color: "#1E4FA3",
+      isFinal: false,
+      displayOrder: 10,
+    },
+    {
+      name: "En cours",
+      description: "Intervention en cours de traitement.",
+      color: "#F2C94C",
+      isFinal: false,
+      displayOrder: 20,
+    },
+    {
+      name: "Cloture",
+      description: "Intervention terminee et fermee.",
+      color: "#2F855A",
+      isFinal: true,
+      displayOrder: 30,
+    },
+  ];
 
   const service = await prisma.service.upsert({
     where: { name: serviceName },
@@ -44,6 +84,38 @@ async function main() {
       serviceId: service.id,
     },
   });
+
+  for (const category of defaultCategories) {
+    await prisma.interventionCategory.upsert({
+      where: { name: category.name },
+      update: {
+        description: category.description,
+        displayOrder: category.displayOrder,
+        isActive: true,
+      },
+      create: {
+        ...category,
+        isActive: true,
+      },
+    });
+  }
+
+  for (const status of defaultStatuses) {
+    await prisma.interventionStatus.upsert({
+      where: { name: status.name },
+      update: {
+        description: status.description,
+        color: status.color,
+        isFinal: status.isFinal,
+        displayOrder: status.displayOrder,
+        isActive: true,
+      },
+      create: {
+        ...status,
+        isActive: true,
+      },
+    });
+  }
 
   console.log(`Admin ready: ${admin.email}`);
 }
