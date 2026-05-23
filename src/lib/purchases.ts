@@ -64,11 +64,13 @@ export function canEditPurchaseDraft(
   user: SessionUserLike,
   purchase: PurchaseAccessTarget
 ) {
+  const editableStatuses: PurchaseStatus[] = ["brouillon", "informations_demandees"];
+
   if (user.role === "admin") {
-    return purchase.status === "brouillon";
+    return editableStatuses.includes(purchase.status);
   }
 
-  return user.id === purchase.requesterId && purchase.status === "brouillon";
+  return user.id === purchase.requesterId && editableStatuses.includes(purchase.status);
 }
 
 export function generatePurchaseRequestNumber(date = new Date()) {
@@ -98,4 +100,20 @@ export function isPurchaseStatus(value: unknown): value is PurchaseStatus {
 
 export function isPurchaseManagerRole(role: Role) {
   return MANAGER_ROLES.includes(role);
+}
+
+export function getPurchaseWorkflowTargets(currentStatus: PurchaseStatus) {
+  switch (currentStatus) {
+    case "soumise":
+      return ["validee", "refusee", "informations_demandees"] as const;
+    case "validee":
+    case "refusee":
+      return ["cloturee"] as const;
+    default:
+      return [] as const;
+  }
+}
+
+export function isPurchaseClosed(status: PurchaseStatus) {
+  return status === "cloturee";
 }

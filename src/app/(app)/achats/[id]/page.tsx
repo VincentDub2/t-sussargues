@@ -3,17 +3,21 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { PurchaseDraftForm } from "@/components/purchases/purchase-draft-form";
+import { PurchaseHistoryList } from "@/components/purchases/purchase-history-list";
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge";
 import { PurchaseWorkflowForm } from "@/components/purchases/purchase-workflow-form";
 import { SubmitPurchaseButton } from "@/components/purchases/submit-purchase-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import {
   canEditPurchaseDraft,
   canManagePurchaseWorkflow,
   getPurchaseVisibilityWhere,
+  getPurchaseWorkflowTargets,
+  isPurchaseClosed,
 } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
 
@@ -83,14 +87,32 @@ export default async function PurchaseDetailPage({
     notFound();
   }
 
-  const services = await prisma.service.findMany({
-    where: { isActive: true },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
+  const [services, history] = await Promise.all([
+    prisma.service.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+      },
+    }),
+    prisma.purchaseRequestHistory.findMany({
+      where: { purchaseRequestId: purchase.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        action: true,
+        message: true,
+        createdAt: true,
+        actor: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    }),
+  ]);
 
   const canEditDraft = canEditPurchaseDraft(
     {
@@ -113,6 +135,8 @@ export default async function PurchaseDetailPage({
     },
     purchase.serviceId
   );
+  const availableWorkflowStatuses = getPurchaseWorkflowTargets(purchase.status);
+  const isClosed = isPurchaseClosed(purchase.status);
 
   return (
     <div className="space-y-6">
@@ -179,15 +203,21 @@ export default async function PurchaseDetailPage({
               Retour a la liste
             </Link>
 
-            {purchase.status === "brouillon" ? (
-              <SubmitPurchaseButton purchaseId={purchase.id} disabled={!canEditDraft} />
+            {purchase.status === "brouillon" || purchase.status === "informations_demandees" ? (
+              <SubmitPurchaseButton
+                purchaseId={purchase.id}
+                status={purchase.status}
+                disabled={!canEditDraft}
+              />
             ) : null}
 
             <div className="rounded-lg border border-border bg-secondary p-4 text-sm text-muted">
-              {canManage
-                ? "Vous pouvez statuer sur cette demande lorsqu'elle est soumise."
+              {isClosed
+                ? "Cette demande est cloturee. Elle reste consultable, mais plus aucune modification n'est possible."
+                : canManage
+                ? "Vous pouvez valider, refuser, demander des informations ou cloturer selon l'etat de la demande."
                 : canEditDraft
-                  ? "Vous pouvez encore modifier ce brouillon avant sa soumission."
+                  ? "Vous pouvez completer cette demande puis la soumettre ou la renvoyer pour validation."
                   : "Cette demande est visible dans votre perimetre actuel."}
             </div>
           </CardContent>
@@ -197,9 +227,9 @@ export default async function PurchaseDetailPage({
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <CardTitle>Brouillon</CardTitle>
+            <CardTitle>Demande</CardTitle>
             <CardDescription>
-              Edition possible uniquement tant que la demande reste en brouillon.
+              Edition possible tant que la demande est en brouillon ou en attente d&apos;informations complementaires.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -224,18 +254,29 @@ export default async function PurchaseDetailPage({
           <CardHeader>
             <CardTitle>Validation</CardTitle>
             <CardDescription>
-              Workflow minimal: brouillon, puis soumise, puis validee ou refusee.
+              Workflow metier: soumission, informations complementaires, decision, puis cloture.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <PurchaseWorkflowForm
-              purchase={{
-                id: purchase.id,
-                status: purchase.status,
-                validationComment: purchase.validationComment,
-              }}
-              disabled={!canManage || purchase.status !== "soumise"}
-            />
+            {availableWorkflowStatuses.length > 0 ? (
+              <PurchaseWorkflowForm
+                purchase={{
+                  id: purchase.id,
+                  status: purchase.status,
+                  validationComment: purchase.validationComment,
+                }}
+                availableStatuses={[...availableWorkflowStatuses]}
+                disabled={!canManage}
+              />
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-secondary p-4 text-sm text-muted">
+                {isClosed
+                  ? "Cette demande est deja cloturee."
+                  : "Aucune action de workflow n'est disponible pour l'etat actuel de la demande."}
+              </div>
+            )}
+
+            <Separator />
 
             <div className="grid gap-3 text-sm text-muted">
               <div>
@@ -263,6 +304,18 @@ export default async function PurchaseDetailPage({
           </CardContent>
         </Card>
       </section>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Historique</CardTitle>
+          <CardDescription>
+            Trace des validations, refus, demandes d&apos;informations et clotures sur cette demande d&apos;achat.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PurchaseHistoryList entries={history} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

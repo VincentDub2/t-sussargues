@@ -3,11 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
+import type { PurchaseStatus } from "@/generated/prisma/client";
+import { createPurchaseHistoryEntry } from "@/lib/purchase-history";
+import { PURCHASE_STATUS_LABELS } from "@/lib/labels";
 import {
-  generatePurchaseRequestNumber,
-  getPurchaseVisibilityWhere,
   canEditPurchaseDraft,
   canManagePurchaseWorkflow,
+  generatePurchaseRequestNumber,
+  getPurchaseVisibilityWhere,
+  getPurchaseWorkflowTargets,
+  isPurchaseClosed,
   parsePriorityValue,
   parsePurchaseStatusValue,
 } from "@/lib/purchases";
@@ -42,6 +47,10 @@ function toNullableBudget(value: FormDataEntryValue | null) {
 
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed.toFixed(2) : null;
+}
+
+function formatStatusTransition(from: PurchaseStatus, to: PurchaseStatus) {
+  return `${PURCHASE_STATUS_LABELS[from]} -> ${PURCHASE_STATUS_LABELS[to]}`;
 }
 
 export async function createPurchaseRequest(
@@ -88,22 +97,33 @@ export async function createPurchaseRequest(
   }
 
   try {
-    const purchase = await prisma.purchaseRequest.create({
-      data: {
-        requestNumber: generatePurchaseRequestNumber(),
-        title,
-        description,
-        supplier,
-        quantity,
-        estimatedBudget,
-        priority,
-        requesterId: session.user.id,
-        serviceId,
-      },
-      select: {
-        id: true,
-        requestNumber: true,
-      },
+    const purchase = await prisma.$transaction(async (tx) => {
+      const createdPurchase = await tx.purchaseRequest.create({
+        data: {
+          requestNumber: generatePurchaseRequestNumber(),
+          title,
+          description,
+          supplier,
+          quantity,
+          estimatedBudget,
+          priority,
+          requesterId: session.user.id,
+          serviceId,
+        },
+        select: {
+          id: true,
+          requestNumber: true,
+        },
+      });
+
+      await createPurchaseHistoryEntry(tx, {
+        purchaseRequestId: createdPurchase.id,
+        actorId: session.user.id,
+        action: "creation",
+        message: `Demande ${createdPurchase.requestNumber} creee en brouillon.`,
+      });
+
+      return createdPurchase;
     });
 
     revalidatePath("/achats");
@@ -162,6 +182,12 @@ export async function updatePurchaseDraft(
       requesterId: true,
       serviceId: true,
       status: true,
+      title: true,
+      description: true,
+      supplier: true,
+      quantity: true,
+      estimatedBudget: true,
+      priority: true,
     },
   });
 
@@ -205,17 +231,58 @@ export async function updatePurchaseDraft(
   }
 
   try {
-    await prisma.purchaseRequest.update({
-      where: { id: purchaseId },
-      data: {
-        title,
-        description,
-        supplier,
-        quantity,
-        estimatedBudget,
-        priority,
-        serviceId,
-      },
+    await prisma.$transaction(async (tx) => {
+      const changes: string[] = [];
+
+      if (purchase.title !== title) {
+        changes.push("objet ajuste");
+      }
+
+      if (purchase.description !== description) {
+        changes.push("description mise a jour");
+      }
+
+      if (purchase.supplier !== supplier) {
+        changes.push("fournisseur mis a jour");
+      }
+
+      if (purchase.quantity !== quantity) {
+        changes.push("quantite ajustee");
+      }
+
+      if ((purchase.estimatedBudget?.toString() ?? null) !== estimatedBudget) {
+        changes.push("budget ajuste");
+      }
+
+      if (purchase.priority !== priority) {
+        changes.push("priorite mise a jour");
+      }
+
+      if (purchase.serviceId !== serviceId) {
+        changes.push("service mis a jour");
+      }
+
+      await tx.purchaseRequest.update({
+        where: { id: purchaseId },
+        data: {
+          title,
+          description,
+          supplier,
+          quantity,
+          estimatedBudget,
+          priority,
+          serviceId,
+        },
+      });
+
+      if (changes.length > 0) {
+        await createPurchaseHistoryEntry(tx, {
+          purchaseRequestId: purchaseId,
+          actorId: session.user.id,
+          action: "modification",
+          message: `Demande modifiee: ${changes.join(", ")}.`,
+        });
+      }
     });
   } catch (error) {
     return {
@@ -282,13 +349,25 @@ export async function submitPurchaseRequest(
   }
 
   try {
-    await prisma.purchaseRequest.update({
-      where: { id: purchaseId },
-      data: {
-        status: "soumise",
-        validationComment: null,
-        validatorId: null,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseRequest.update({
+        where: { id: purchaseId },
+        data: {
+          status: "soumise",
+          validationComment: null,
+          validatorId: null,
+        },
+      });
+
+      await createPurchaseHistoryEntry(tx, {
+        purchaseRequestId: purchaseId,
+        actorId: session.user.id,
+        action: "soumission",
+        message:
+          purchase.status === "informations_demandees"
+            ? "Demande mise a jour puis renvoyee pour validation."
+            : "Demande soumise pour validation.",
+      });
     });
   } catch (error) {
     return {
@@ -318,10 +397,6 @@ export async function updatePurchaseStatus(
   const status = parsePurchaseStatusValue(formData.get("status"));
   const validationComment = toNullableString(formData.get("validationComment"));
 
-  if (!status || !["validee", "refusee"].includes(status)) {
-    return { error: "Le statut choisi n'est pas autorise dans ce workflow." };
-  }
-
   const purchase = await prisma.purchaseRequest.findFirst({
     where: {
       id: purchaseId,
@@ -337,11 +412,18 @@ export async function updatePurchaseStatus(
       id: true,
       serviceId: true,
       status: true,
+      requestNumber: true,
     },
   });
 
   if (!purchase) {
     return { error: "Demande d'achat introuvable." };
+  }
+
+  const availableTargets = getPurchaseWorkflowTargets(purchase.status);
+
+  if (!status || !availableTargets.some((candidate) => candidate === status)) {
+    return { error: "Le statut choisi n'est pas autorise dans ce workflow." };
   }
 
   if (
@@ -359,20 +441,63 @@ export async function updatePurchaseStatus(
     };
   }
 
-  if (purchase.status !== "soumise") {
+  if (isPurchaseClosed(purchase.status)) {
     return {
-      error: "Seule une demande soumise peut etre validee ou refusee.",
+      error: "Une demande cloturee ne peut plus evoluer.",
+    };
+  }
+
+  if (["refusee", "informations_demandees"].includes(status) && !validationComment) {
+    return {
+      error: "Un commentaire est obligatoire pour motiver cette decision.",
     };
   }
 
   try {
-    await prisma.purchaseRequest.update({
-      where: { id: purchaseId },
-      data: {
-        status,
-        validatorId: session.user.id,
-        validationComment,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseRequest.update({
+        where: { id: purchaseId },
+        data: {
+          status,
+          validatorId: session.user.id,
+          validationComment,
+        },
+      });
+
+      let historyAction:
+        | "validation"
+        | "refus"
+        | "informations_complementaires"
+        | "cloture";
+      let historyMessage: string;
+
+      switch (status) {
+        case "validee":
+          historyAction = "validation";
+          historyMessage = `Demande ${purchase.requestNumber} validee.${validationComment ? ` Commentaire: ${validationComment}` : ""}`;
+          break;
+        case "refusee":
+          historyAction = "refus";
+          historyMessage = `Demande ${purchase.requestNumber} refusee. Commentaire: ${validationComment}`;
+          break;
+        case "informations_demandees":
+          historyAction = "informations_complementaires";
+          historyMessage = `Informations complementaires demandees pour ${purchase.requestNumber}. Commentaire: ${validationComment}`;
+          break;
+        case "cloturee":
+          historyAction = "cloture";
+          historyMessage = `Demande ${purchase.requestNumber} cloturee.${validationComment ? ` Commentaire: ${validationComment}` : ""}`;
+          break;
+        default:
+          throw new Error("Statut de workflow achat non pris en charge.");
+      }
+
+      await createPurchaseHistoryEntry(tx, {
+        purchaseRequestId: purchaseId,
+        actorId: session.user.id,
+        action: historyAction,
+        message: `${historyMessage} (${formatStatusTransition(purchase.status, status)})`,
+      });
     });
   } catch (error) {
     return {
@@ -387,6 +512,13 @@ export async function updatePurchaseStatus(
   revalidatePath(`/achats/${purchaseId}`);
 
   return {
-    success: status === "validee" ? "Demande validee." : "Demande refusee.",
+    success:
+      status === "validee"
+        ? "Demande validee."
+        : status === "refusee"
+          ? "Demande refusee."
+          : status === "informations_demandees"
+            ? "Informations complementaires demandees."
+            : "Demande cloturee.",
   };
 }

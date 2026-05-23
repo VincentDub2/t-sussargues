@@ -11,6 +11,7 @@ const requiredDelegates = [
   "intervention",
   "interventionHistory",
   "purchaseRequest",
+  "purchaseRequestHistory",
   "notificationLog",
 ] as const;
 

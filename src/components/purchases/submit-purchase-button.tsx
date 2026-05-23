@@ -11,22 +11,35 @@ import { Button } from "@/components/ui/button";
 
 type SubmitPurchaseButtonProps = {
   purchaseId: string;
+  status: "brouillon" | "informations_demandees";
   disabled?: boolean;
 };
 
 const initialState: PurchaseActionState = {};
 
-function SubmitButton({ disabled }: { disabled?: boolean }) {
+function SubmitButton({
+  disabled,
+  status,
+}: {
+  disabled?: boolean;
+  status: "brouillon" | "informations_demandees";
+}) {
   const { pending } = useFormStatus();
+  const idleLabel =
+    status === "informations_demandees"
+      ? "Renvoyer pour validation"
+      : "Soumettre la demande";
+
   return (
     <Button disabled={disabled || pending}>
-      {pending ? "Soumission..." : "Soumettre la demande"}
+      {pending ? "Soumission..." : idleLabel}
     </Button>
   );
 }
 
 export function SubmitPurchaseButton({
   purchaseId,
+  status,
   disabled = false,
 }: SubmitPurchaseButtonProps) {
   const action = submitPurchaseRequest.bind(null, purchaseId);
@@ -36,7 +49,7 @@ export function SubmitPurchaseButton({
     <form action={formAction} className="space-y-2">
       {state.error ? <p className="text-sm text-danger">{state.error}</p> : null}
       {state.success ? <p className="text-sm text-success">{state.success}</p> : null}
-      <SubmitButton disabled={disabled} />
+      <SubmitButton disabled={disabled} status={status} />
     </form>
   );
 }
