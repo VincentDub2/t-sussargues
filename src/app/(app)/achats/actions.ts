@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import type { PurchaseStatus } from "@/generated/prisma/client";
+import {
+  sendPurchaseRejectedEmail,
+  sendPurchaseValidatedEmail,
+} from "@/lib/email";
 import { createPurchaseHistoryEntry } from "@/lib/purchase-history";
 import { PURCHASE_STATUS_LABELS } from "@/lib/labels";
 import {
@@ -413,6 +417,13 @@ export async function updatePurchaseStatus(
       serviceId: true,
       status: true,
       requestNumber: true,
+      title: true,
+      requester: {
+        select: {
+          email: true,
+          firstName: true,
+        },
+      },
     },
   });
 
@@ -510,6 +521,28 @@ export async function updatePurchaseStatus(
 
   revalidatePath("/achats");
   revalidatePath(`/achats/${purchaseId}`);
+
+  if (status === "validee" && purchase.requester.email) {
+    await sendPurchaseValidatedEmail({
+      email: purchase.requester.email,
+      firstName: purchase.requester.firstName,
+      requestNumber: purchase.requestNumber,
+      title: purchase.title,
+      decidedByName: `${session.user.firstName} ${session.user.lastName}`.trim(),
+      comment: validationComment,
+    });
+  }
+
+  if (status === "refusee" && purchase.requester.email) {
+    await sendPurchaseRejectedEmail({
+      email: purchase.requester.email,
+      firstName: purchase.requester.firstName,
+      requestNumber: purchase.requestNumber,
+      title: purchase.title,
+      decidedByName: `${session.user.firstName} ${session.user.lastName}`.trim(),
+      comment: validationComment,
+    });
+  }
 
   return {
     success:

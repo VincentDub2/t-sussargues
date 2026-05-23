@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import type { Role } from "@/generated/prisma/client";
 import {
+  sendInterventionAssignedEmail,
+  sendInterventionCreatedEmail,
+} from "@/lib/email";
+import {
   createInterventionHistoryEntry,
   formatNullableLabel,
   formatPriorityLabel,
@@ -115,6 +119,15 @@ export async function createIntervention(
     });
 
     revalidatePath("/interventions");
+
+    if (session.user.email) {
+      await sendInterventionCreatedEmail({
+        email: session.user.email,
+        firstName: session.user.firstName,
+        ticketNumber: intervention.ticketNumber,
+        title,
+      });
+    }
 
     return {
       success: `Intervention ${intervention.ticketNumber} creee.`,
@@ -311,6 +324,8 @@ export async function updateInterventionWorkflow(
     where: { id: interventionId },
     select: {
       id: true,
+      ticketNumber: true,
+      title: true,
       serviceId: true,
       priority: true,
       assignedToId: true,
@@ -363,6 +378,7 @@ export async function updateInterventionWorkflow(
           serviceId: true,
           firstName: true,
           lastName: true,
+          email: true,
         },
       })
       : Promise.resolve(null),
@@ -470,6 +486,19 @@ export async function updateInterventionWorkflow(
 
   revalidatePath("/interventions");
   revalidatePath(`/interventions/${interventionId}`);
+
+  if (
+    assignee?.email &&
+    (intervention.assignedToId ?? null) !== (assignedToId ?? null)
+  ) {
+    await sendInterventionAssignedEmail({
+      email: assignee.email,
+      firstName: assignee.firstName,
+      ticketNumber: intervention.ticketNumber,
+      title: intervention.title,
+      assignedByName: `${session.user.firstName} ${session.user.lastName}`.trim(),
+    });
+  }
 
   return { success: "Suivi d'intervention mis a jour." };
 }

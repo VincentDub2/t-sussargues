@@ -129,18 +129,12 @@ export async function createInvitation(
       invitationUrl,
     });
 
-    await prisma.notificationLog.create({
-      data: {
-        event: "user_invitation",
-        recipient: email,
-        subject: "Invitation a rejoindre l'application T-Sussargues",
-        status: delivery.status,
-        errorMessage:
-          delivery.status === "dev_preview"
-            ? `Preview URL: ${delivery.previewUrl}`
-            : null,
-      },
-    });
+    if (delivery.status === "failed") {
+      return {
+        error: "Invitation creee, mais l'email n'a pas pu etre envoye.",
+        errorDetails: delivery.errorMessage,
+      };
+    }
 
     revalidatePath("/admin/users");
     revalidatePath("/admin/users/invite");
@@ -152,22 +146,10 @@ export async function createInvitation(
       previewUrl: delivery.status === "dev_preview" ? delivery.previewUrl : undefined,
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Envoi de l'email impossible.";
-
-    await prisma.notificationLog.create({
-      data: {
-        event: "user_invitation",
-        recipient: email,
-        subject: "Invitation a rejoindre l'application T-Sussargues",
-        status: "failed",
-        errorMessage: message,
-      },
-    });
-
     return {
       error: "Invitation creee, mais l'email n'a pas pu etre envoye.",
-      errorDetails: message,
+      errorDetails:
+        error instanceof Error ? error.message : "Envoi de l'email impossible.",
     };
   }
 }

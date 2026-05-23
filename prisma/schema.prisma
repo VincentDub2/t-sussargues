@@ -22,6 +22,7 @@ model User {
   service                  Service?          @relation("ServiceUsers", fields: [serviceId], references: [id], onDelete: SetNull)
   managedService           Service?          @relation("ServiceManager")
   invitationsSent          UserInvitation[]  @relation("InvitationSender")
+  passwordResetTokens      PasswordResetToken[]
   requestedInterventions   Intervention[]    @relation("InterventionRequester")
   assignedInterventions    Intervention[]    @relation("InterventionAssignee")
   interventionHistory      InterventionHistory[]
@@ -73,6 +74,20 @@ model UserInvitation {
   @@index([email])
   @@index([serviceId])
   @@index([invitedById])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
   @@index([expiresAt])
 }
 
