@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { InterventionDetailsForm } from "@/components/interventions/intervention-details-form";
+import { InterventionHistoryList } from "@/components/interventions/intervention-history-list";
 import { InterventionStatusBadge } from "@/components/interventions/intervention-status-badge";
 import { InterventionWorkflowForm } from "@/components/interventions/intervention-workflow-form";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +67,7 @@ export default async function InterventionDetailPage({
     notFound();
   }
 
-  const [categories, services, statuses, assignees] = await Promise.all([
+  const [categories, services, statuses, assignees, history] = await Promise.all([
     prisma.interventionCategory.findMany({
       where: { isActive: true },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
@@ -96,6 +97,22 @@ export default async function InterventionDetailPage({
         lastName: true,
         service: {
           select: { name: true },
+        },
+      },
+    }),
+    prisma.interventionHistory.findMany({
+      where: { interventionId: intervention.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        action: true,
+        message: true,
+        createdAt: true,
+        actor: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
         },
       },
     }),
@@ -271,6 +288,18 @@ export default async function InterventionDetailPage({
           </CardContent>
         </Card>
       </section>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Historique</CardTitle>
+          <CardDescription>
+            Trace des actions importantes effectuees sur cette intervention.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <InterventionHistoryList entries={history} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
