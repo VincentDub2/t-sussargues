@@ -83,13 +83,15 @@ export default async function AdminUsersPage() {
         </Link>
         <Link
           href="/admin/users/invite"
-          className={buttonVariants({ className: "w-full sm:w-auto" })}
+          className={buttonVariants({
+            className: "w-full sm:w-auto !text-white font-bold",
+          })}
         >
           Inviter un utilisateur
         </Link>
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+      <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.9fr)]">
         <Card>
           <CardHeader>
             <CardTitle>Annuaire interne</CardTitle>
@@ -123,10 +125,7 @@ export default async function AdminUsersPage() {
           <CardContent className="space-y-3">
             {invitations.length > 0 ? (
               invitations.map((invitation) => (
-                <div
-                  key={invitation.id}
-                  className="rounded-lg border border-border p-4"
-                >
+                <div key={invitation.id} className="rounded-lg border border-border p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">
                       {invitation.firstName} {invitation.lastName}

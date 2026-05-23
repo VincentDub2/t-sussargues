@@ -70,9 +70,9 @@ export function UserAdminCard({ currentUserId, services, user }: UserAdminCardPr
 
   return (
     <div className="rounded-lg border border-border p-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Avatar className="size-11">
+          <Avatar className="size-11 shrink-0">
             {`${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`}
           </Avatar>
           <div className="min-w-0 flex-1">
@@ -80,8 +80,10 @@ export function UserAdminCard({ currentUserId, services, user }: UserAdminCardPr
               <p className="font-medium">
                 {user.firstName} {user.lastName}
               </p>
-              <Badge variant="outline">{USER_STATUS_LABELS[user.status]}</Badge>
-              {isCurrentUser ? <Badge>Vous</Badge> : null}
+              <Badge variant="outline" className="shrink-0">
+                {USER_STATUS_LABELS[user.status]}
+              </Badge>
+              {isCurrentUser ? <Badge className="shrink-0">Vous</Badge> : null}
             </div>
             <p className="mt-1 text-sm text-muted">{user.email}</p>
             <p className="mt-1 text-sm text-muted">
@@ -91,8 +93,11 @@ export function UserAdminCard({ currentUserId, services, user }: UserAdminCardPr
           </div>
         </div>
 
-        <div className="w-full max-w-2xl space-y-3">
-          <form action={updateFormAction} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <div className="w-full space-y-3 xl:max-w-2xl">
+          <form
+            action={updateFormAction}
+            className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+          >
             <SelectField name="role" defaultValue={user.role}>
               {roles.map((role) => (
                 <option key={role} value={role}>
@@ -114,7 +119,7 @@ export function UserAdminCard({ currentUserId, services, user }: UserAdminCardPr
             <SaveButton />
           </form>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <form action={toggleFormAction}>
               <ToggleButton disabled={isCurrentUser} isActive={user.isActive} />
             </form>

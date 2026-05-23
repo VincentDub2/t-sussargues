@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
+import type { Role } from "@/generated/prisma/client";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { appNavigation } from "./navigation";
+import { getNavigationForRole } from "./navigation";
 
 type AppSidebarProps = {
+  role: Role;
   collapsed: boolean;
   onToggle: () => void;
   mobileOpen: boolean;
@@ -17,12 +20,14 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({
+  role,
   collapsed,
   onToggle,
   mobileOpen,
   onMobileClose,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const navigation = getNavigationForRole(role);
 
   return (
     <>
@@ -53,7 +58,7 @@ export function AppSidebar({
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-3 pb-4">
-          {appNavigation.map((item) => {
+          {navigation.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === item.href
@@ -64,7 +69,7 @@ export function AppSidebar({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors",
                   isActive
                     ? "border-primary-deep bg-primary-deep text-white shadow-sm hover:text-white [&_svg]:text-white"
                     : "border-transparent text-muted hover:border-border hover:bg-card hover:text-foreground",
@@ -72,7 +77,15 @@ export function AppSidebar({
                 )}
               >
                 <item.icon className="size-4" />
-                <span className={cn(collapsed && "hidden")}>{item.title}</span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    isActive && "font-bold text-white",
+                    collapsed && "hidden"
+                  )}
+                >
+                  {item.title}
+                </span>
               </Link>
             );
           })}
@@ -103,7 +116,7 @@ export function AppSidebar({
             </div>
 
             <nav className="flex flex-col gap-1">
-              {appNavigation.map((item) => {
+              {navigation.map((item) => {
                 const isActive =
                   item.href === "/dashboard"
                     ? pathname === item.href
@@ -115,14 +128,16 @@ export function AppSidebar({
                     href={item.href}
                     onClick={onMobileClose}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+                      "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors",
                       isActive
                         ? "border-primary-deep bg-primary-deep text-white shadow-sm hover:text-white [&_svg]:text-white"
                         : "border-transparent text-muted hover:border-border hover:bg-secondary hover:text-foreground"
                     )}
                   >
                     <item.icon className="size-4" />
-                    <span>{item.title}</span>
+                    <span className={cn("font-semibold", isActive && "font-bold text-white")}>
+                      {item.title}
+                    </span>
                   </Link>
                 );
               })}

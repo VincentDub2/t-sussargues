@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import type { Role } from "@/generated/prisma/client";
+
 import { AppSidebar } from "./sidebar";
 import { AppTopbar } from "./topbar";
 
@@ -9,7 +11,7 @@ type AppShellProps = {
   children: React.ReactNode;
   user: {
     name: string;
-    role: string;
+    role: Role;
     initials: string;
   };
   onSignOut: () => Promise<void>;
@@ -23,6 +25,7 @@ export function AppShell({ children, user, onSignOut }: AppShellProps) {
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
         <AppSidebar
+          role={user.role}
           collapsed={collapsed}
           onToggle={() => setCollapsed((value) => !value)}
           mobileOpen={mobileOpen}

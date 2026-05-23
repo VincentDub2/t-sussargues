@@ -328,7 +328,9 @@ export default async function DashboardPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/interventions"
-                className={buttonVariants({ className: "w-full sm:w-auto" })}
+                className={buttonVariants({
+                  className: "w-full sm:w-auto !text-white font-bold",
+                })}
               >
                 Ouvrir les interventions
               </Link>
