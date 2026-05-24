@@ -6,19 +6,21 @@ import {
   BellRing,
   CheckSquare,
   ClipboardList,
+  ListTodo,
   ShoppingCart,
+  UserRoundX,
 } from "lucide-react";
 
 import { auth } from "@/auth";
-import { InterventionStatusBadge } from "@/components/interventions/intervention-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PurchaseStatus } from "@/generated/prisma/client";
 import {
   formatUserDisplayName,
   INTERVENTION_HISTORY_ACTION_LABELS,
 } from "@/lib/intervention-history";
-import { PRIORITY_LABELS } from "@/lib/labels";
+import { PRIORITY_LABELS, PURCHASE_STATUS_LABELS } from "@/lib/labels";
 import {
   formatPurchaseActorDisplayName,
   PURCHASE_HISTORY_ACTION_LABELS,
@@ -60,6 +62,16 @@ type DashboardAction =
       title: string;
     };
 
+const openPurchaseStatuses: PurchaseStatus[] = [
+  "brouillon",
+  "soumise",
+  "en_validation",
+  "informations_demandees",
+  "validee",
+  "en_commande",
+  "receptionnee",
+];
+
 export default async function DashboardPage() {
   const session = await auth();
 
@@ -80,11 +92,14 @@ export default async function DashboardPage() {
   const [
     openInterventionsCount,
     urgentInterventionsCount,
-    pendingPurchasesCount,
+    openPurchasesCount,
+    urgentPurchasesCount,
+    unassignedInterventionsCount,
     validationsToTreatCount,
     recentInterventionHistory,
     recentPurchaseHistory,
     recentInterventions,
+    recentPurchases,
   ] = await Promise.all([
     prisma.intervention.count({
       where: {
@@ -102,10 +117,28 @@ export default async function DashboardPage() {
           purchaseVisibility,
           {
             status: {
-              in: ["brouillon", "soumise", "informations_demandees"],
+              in: openPurchaseStatuses,
             },
           },
         ],
+      },
+    }),
+    prisma.purchaseRequest.count({
+      where: {
+        AND: [
+          purchaseVisibility,
+          {
+            priority: "urgente",
+            status: {
+              in: openPurchaseStatuses,
+            },
+          },
+        ],
+      },
+    }),
+    prisma.intervention.count({
+      where: {
+        AND: [interventionVisibility, { closedAt: null, assignedToId: null }],
       },
     }),
     canManagePurchases
@@ -175,7 +208,9 @@ export default async function DashboardPage() {
       },
     }),
     prisma.intervention.findMany({
-      where: interventionVisibility,
+      where: {
+        AND: [interventionVisibility, { closedAt: null }],
+      },
       orderBy: [{ createdAt: "desc" }],
       take: 5,
       include: {
@@ -193,7 +228,37 @@ export default async function DashboardPage() {
         },
       },
     }),
+    prisma.purchaseRequest.findMany({
+      where: {
+        AND: [
+          purchaseVisibility,
+          {
+            status: {
+              in: openPurchaseStatuses,
+            },
+          },
+        ],
+      },
+      orderBy: [{ createdAt: "desc" }],
+      take: 5,
+      include: {
+        service: {
+          select: {
+            name: true,
+          },
+        },
+        requester: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    }),
   ]);
+
+  const urgentRequestsCount = urgentInterventionsCount + urgentPurchasesCount;
+  const openRequestsCount = openInterventionsCount + openPurchasesCount;
 
   const recentActions = [
     ...recentInterventionHistory.map<DashboardAction>((entry) => ({
@@ -222,32 +287,63 @@ export default async function DashboardPage() {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 8);
 
+  const recentRequests = [
+    ...recentInterventions.map((intervention) => ({
+      id: `intervention-${intervention.id}`,
+      kind: "intervention" as const,
+      href: `/interventions/${intervention.id}`,
+      reference: intervention.ticketNumber,
+      title: intervention.title,
+      createdAt: intervention.createdAt,
+      priorityLabel: PRIORITY_LABELS[intervention.priority],
+      statusLabel: intervention.status.name,
+      serviceName: intervention.service?.name ?? "Sans service",
+      requesterName: `${intervention.requester.firstName} ${intervention.requester.lastName}`,
+    })),
+    ...recentPurchases.map((purchase) => ({
+      id: `purchase-${purchase.id}`,
+      kind: "purchase" as const,
+      href: `/achats/${purchase.id}`,
+      reference: purchase.requestNumber,
+      title: purchase.title,
+      createdAt: purchase.createdAt,
+      priorityLabel: PRIORITY_LABELS[purchase.priority],
+      statusLabel: PURCHASE_STATUS_LABELS[purchase.status],
+      serviceName: purchase.service?.name ?? "Sans service",
+      requesterName: `${purchase.requester.firstName} ${purchase.requester.lastName}`,
+    })),
+  ]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 6);
+
   const dashboardStats = [
     {
-      label: "Interventions ouvertes",
-      value: openInterventionsCount,
-      helper: "Tickets encore en cours dans votre perimetre",
-      icon: ClipboardList,
-    },
-    {
-      label: "Interventions urgentes",
-      value: urgentInterventionsCount,
-      helper: "Priorite urgente a traiter rapidement",
+      label: "Demandes urgentes",
+      value: urgentRequestsCount,
+      helper: `${urgentInterventionsCount} intervention(s) · ${urgentPurchasesCount} achat(s)`,
       icon: AlertTriangle,
+      href: "/interventions",
     },
     {
-      label: "Achats en attente",
-      value: pendingPurchasesCount,
-      helper: "Brouillons, soumissions et retours d'information visibles",
+      label: "Demandes ouvertes",
+      value: openRequestsCount,
+      helper: `${openInterventionsCount} intervention(s) · ${openPurchasesCount} achat(s)`,
+      icon: ListTodo,
+      href: "/interventions",
+    },
+    {
+      label: "Interventions non assignees",
+      value: unassignedInterventionsCount,
+      helper: "Tickets ouverts sans agent affecte",
+      icon: UserRoundX,
+      href: "/interventions",
+    },
+    {
+      label: "Achats ouverts",
+      value: openPurchasesCount,
+      helper: "Demandes d'achat encore en cours",
       icon: ShoppingCart,
-    },
-    {
-      label: "Validations a traiter",
-      value: validationsToTreatCount,
-      helper: canManagePurchases
-        ? "Demandes soumises qui attendent votre decision"
-        : "Accessible aux admins et responsables de service",
-      icon: CheckSquare,
+      href: "/achats",
     },
   ] as const;
 
@@ -259,14 +355,15 @@ export default async function DashboardPage() {
             <p className="text-xs uppercase tracking-[0.24em] text-muted">Vue generale</p>
             <CardTitle className="text-2xl">Dashboard</CardTitle>
             <CardDescription>
-              Vue rapide des urgences, des validations et de l&apos;activite recente dans votre perimetre.
+              Vue rapide des demandes urgentes, ouvertes et non assignees dans votre perimetre.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {dashboardStats.map((item) => (
-              <div
+              <Link
                 key={item.label}
-                className="rounded-lg border border-border bg-secondary p-4"
+                href={item.href}
+                className="rounded-lg border border-border bg-secondary p-4 transition-colors hover:bg-muted/70"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
@@ -276,38 +373,65 @@ export default async function DashboardPage() {
                   <item.icon className="mt-1 size-4 text-primary" />
                 </div>
                 <p className="mt-3 text-sm leading-6 text-muted">{item.helper}</p>
-              </div>
+              </Link>
             ))}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Priorites du moment</CardTitle>
+            <CardTitle>A traiter maintenant</CardTitle>
             <CardDescription>
               Ce qui demande votre attention immediate.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border border-border bg-secondary p-4">
+            <Link
+              href="/interventions"
+              className="block rounded-lg border border-border bg-secondary p-4 transition-colors hover:bg-muted/70"
+            >
               <div className="flex items-start gap-3">
                 <BellRing className="mt-1 size-4 text-primary" />
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">
-                    {urgentInterventionsCount > 0
-                      ? `${urgentInterventionsCount} intervention(s) urgente(s)`
+                    {urgentRequestsCount > 0
+                      ? `${urgentRequestsCount} demande(s) urgente(s)`
                       : "Aucune urgence detectee"}
                   </p>
                   <p className="text-sm leading-6 text-muted">
-                    {urgentInterventionsCount > 0
-                      ? "Passez par la liste des interventions pour prioriser les tickets critiques."
+                    {urgentRequestsCount > 0
+                      ? `${urgentInterventionsCount} intervention(s) et ${urgentPurchasesCount} achat(s) a prioriser.`
                       : "Le niveau d'urgence est stable pour le moment."}
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
 
-            <div className="rounded-lg border border-border bg-secondary p-4">
+            <Link
+              href="/interventions"
+              className="block rounded-lg border border-border bg-secondary p-4 transition-colors hover:bg-muted/70"
+            >
+              <div className="flex items-start gap-3">
+                <UserRoundX className="mt-1 size-4 text-primary" />
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">
+                    {unassignedInterventionsCount > 0
+                      ? `${unassignedInterventionsCount} intervention(s) non assignee(s)`
+                      : "Aucune intervention sans agent"}
+                  </p>
+                  <p className="text-sm leading-6 text-muted">
+                    {unassignedInterventionsCount > 0
+                      ? "Affectez les tickets ouverts pour eviter qu'ils restent sans suivi."
+                      : "Les tickets ouverts visibles ont deja un responsable ou n'ont pas besoin d'affectation."}
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href="/achats"
+              className="block rounded-lg border border-border bg-secondary p-4 transition-colors hover:bg-muted/70"
+            >
               <div className="flex items-start gap-3">
                 <CheckSquare className="mt-1 size-4 text-primary" />
                 <div className="space-y-1">
@@ -323,14 +447,14 @@ export default async function DashboardPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
 
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/interventions"
-                  className={buttonVariants({
-                    className: "w-full sm:w-auto text-primary-foreground hover:text-primary-foreground",
-                  })}
+                className={buttonVariants({
+                  className: "w-full sm:w-auto text-primary-foreground hover:text-primary-foreground",
+                })}
               >
                 Ouvrir les interventions
               </Link>
@@ -351,7 +475,7 @@ export default async function DashboardPage() {
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <CardTitle>Dernieres actions</CardTitle>
+            <CardTitle>Dernieres actions utiles</CardTitle>
             <CardDescription>
               Journal recent des interventions et des demandes d&apos;achat visibles pour vous.
             </CardDescription>
@@ -396,80 +520,70 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Dernieres interventions</CardTitle>
+            <CardTitle>Demandes recentes</CardTitle>
             <CardDescription>
-              Les derniers tickets crees ou visibles dans votre espace de travail.
+              Dernieres demandes ouvertes, interventions et achats confondus.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentInterventions.length > 0 ? (
-              recentInterventions.map((intervention) => (
-                <div
-                  key={intervention.id}
-                  className="rounded-lg border border-border p-4"
+            {recentRequests.length > 0 ? (
+              recentRequests.map((request) => (
+                <Link
+                  key={request.id}
+                  href={request.href}
+                  className="block rounded-lg border border-border p-4 transition-colors hover:bg-secondary"
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/interventions/${intervention.id}`}
-                          className="font-semibold text-foreground underline-offset-4 hover:underline"
-                        >
-                          {intervention.ticketNumber}
-                        </Link>
                         <Badge variant="outline">
-                          {PRIORITY_LABELS[intervention.priority]}
+                          {request.kind === "intervention" ? "Intervention" : "Achat"}
                         </Badge>
-                        <InterventionStatusBadge
-                          label={intervention.status.name}
-                          color={intervention.status.color}
-                        />
+                        <span className="font-semibold text-foreground">
+                          {request.reference}
+                        </span>
+                        <Badge variant="outline">
+                          {request.priorityLabel}
+                        </Badge>
+                        <Badge variant="outline">{request.statusLabel}</Badge>
                       </div>
-                      <p className="font-medium text-foreground">{intervention.title}</p>
+                      <p className="font-medium text-foreground">{request.title}</p>
                     </div>
 
-                    <Link
-                      href={`/interventions/${intervention.id}`}
-                      className={buttonVariants({
-                        variant: "outline",
-                        className: "w-full sm:w-auto",
-                      })}
-                    >
-                      Voir
-                    </Link>
+                    <ArrowRight className="mt-1 size-4 shrink-0 text-muted" />
                   </div>
 
                   <div className="mt-4 grid gap-3 text-sm text-muted sm:grid-cols-2">
                     <div>
                       <p className="text-xs uppercase tracking-[0.18em]">Demandeur</p>
                       <p className="mt-1 text-foreground">
-                        {intervention.requester.firstName} {intervention.requester.lastName}
+                        {request.requesterName}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.18em]">Service</p>
                       <p className="mt-1 text-foreground">
-                        {intervention.service?.name ?? "Sans service"}
+                        {request.serviceName}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.18em]">Creation</p>
                       <p className="mt-1 text-foreground">
-                        {formatDateTime(intervention.createdAt)}
+                        {formatDateTime(request.createdAt)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.18em]">Etat</p>
+                      <p className="text-xs uppercase tracking-[0.18em]">Type</p>
                       <p className="mt-1 text-foreground">
-                        {intervention.closedAt ? "Cloturee" : "Ouverte"}
+                        {request.kind === "intervention" ? "Intervention" : "Achat"}
                       </p>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))
             ) : (
               <div className="rounded-lg border border-dashed border-border bg-secondary p-5 text-sm text-muted">
-                Aucune intervention recente n&apos;est visible pour le moment.
+                Aucune demande ouverte n&apos;est visible pour le moment.
               </div>
             )}
           </CardContent>

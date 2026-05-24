@@ -1,5 +1,6 @@
 import type {
   Priority,
+  PurchaseDocumentType,
   PurchaseStatus,
   Role,
   UserStatus,
@@ -36,4 +37,12 @@ export const PURCHASE_STATUS_LABELS: Record<PurchaseStatus, string> = {
   en_commande: "En commande",
   receptionnee: "Receptionnee",
   cloturee: "Cloturee",
+};
+
+export const PURCHASE_DOCUMENT_TYPE_LABELS: Record<PurchaseDocumentType, string> = {
+  devis: "Devis",
+  ticket_caisse: "Ticket de caisse",
+  facture: "Facture",
+  bon_commande: "Bon de commande",
+  autre: "Autre justificatif",
 };

@@ -66,7 +66,7 @@ export default async function AchatsPage() {
             <p className="text-xs uppercase tracking-[0.24em] text-muted">Module metier</p>
             <CardTitle className="text-2xl">Demandes d&apos;achat</CardTitle>
             <CardDescription>
-              Suivi simple des besoins d&apos;achat avec brouillon, soumission et decision.
+              Suivi des demandes de depense avec devis, tickets, factures et validation.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">

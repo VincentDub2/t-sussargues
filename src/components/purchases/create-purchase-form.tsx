@@ -47,33 +47,33 @@ export function CreatePurchaseForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <label htmlFor="title" className="text-sm font-medium text-foreground">
-          Objet
+          Objet de la depense
         </label>
         <Input id="title" name="title" required />
       </div>
 
       <div className="space-y-2">
         <label htmlFor="description" className="text-sm font-medium text-foreground">
-          Description
+          Besoin / contexte
         </label>
         <Textarea
           id="description"
           name="description"
           required
-          placeholder="Precisez le besoin, l'usage prevu et le contexte."
+          placeholder="Precisez le besoin, l'usage prevu, le contexte et les justificatifs attendus."
         />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="supplier" className="text-sm font-medium text-foreground">
-            Fournisseur
+            Fournisseur pressenti
           </label>
           <Input id="supplier" name="supplier" placeholder="Optionnel" />
         </div>
         <div className="space-y-2">
           <label htmlFor="quantity" className="text-sm font-medium text-foreground">
-            Quantite
+            Quantite, si utile
           </label>
           <Input id="quantity" name="quantity" type="number" min="1" placeholder="1" />
         </div>

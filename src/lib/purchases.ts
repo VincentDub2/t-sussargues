@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
 
-import type { Prisma, Priority, PurchaseStatus, Role } from "@/generated/prisma/client";
+import type {
+  Prisma,
+  Priority,
+  PurchaseDocumentType,
+  PurchaseStatus,
+  Role,
+} from "@/generated/prisma/client";
 
 type SessionUserLike = {
   id: string;
@@ -26,6 +32,13 @@ const PURCHASE_STATUSES: PurchaseStatus[] = [
   "en_commande",
   "receptionnee",
   "cloturee",
+];
+const PURCHASE_DOCUMENT_TYPES: PurchaseDocumentType[] = [
+  "devis",
+  "ticket_caisse",
+  "facture",
+  "bon_commande",
+  "autre",
 ];
 
 export function getPurchaseVisibilityWhere(
@@ -87,6 +100,12 @@ export function parsePurchaseStatusValue(
   return isPurchaseStatus(value) ? value : null;
 }
 
+export function parsePurchaseDocumentTypeValue(
+  value: FormDataEntryValue | null
+): PurchaseDocumentType | null {
+  return isPurchaseDocumentType(value) ? value : null;
+}
+
 export function isPriority(value: unknown): value is Priority {
   return typeof value === "string" && PRIORITIES.includes(value as Priority);
 }
@@ -95,6 +114,13 @@ export function isPurchaseStatus(value: unknown): value is PurchaseStatus {
   return (
     typeof value === "string" &&
     PURCHASE_STATUSES.includes(value as PurchaseStatus)
+  );
+}
+
+export function isPurchaseDocumentType(value: unknown): value is PurchaseDocumentType {
+  return (
+    typeof value === "string" &&
+    PURCHASE_DOCUMENT_TYPES.includes(value as PurchaseDocumentType)
   );
 }
 
@@ -116,4 +142,18 @@ export function getPurchaseWorkflowTargets(currentStatus: PurchaseStatus) {
 
 export function isPurchaseClosed(status: PurchaseStatus) {
   return status === "cloturee";
+}
+
+export function canEditPurchaseDocuments(
+  user: SessionUserLike,
+  purchase: PurchaseAccessTarget
+) {
+  if (isPurchaseClosed(purchase.status)) {
+    return false;
+  }
+
+  return (
+    canEditPurchaseDraft(user, purchase) ||
+    canManagePurchaseWorkflow(user, purchase.serviceId)
+  );
 }

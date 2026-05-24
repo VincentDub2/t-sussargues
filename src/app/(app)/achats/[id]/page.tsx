@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { PurchaseDocumentsPanel } from "@/components/purchases/purchase-documents-panel";
 import { PurchaseDraftForm } from "@/components/purchases/purchase-draft-form";
 import { PurchaseHistoryList } from "@/components/purchases/purchase-history-list";
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge";
@@ -14,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import {
   canEditPurchaseDraft,
+  canEditPurchaseDocuments,
   canManagePurchaseWorkflow,
   getPurchaseVisibilityWhere,
   getPurchaseWorkflowTargets,
@@ -87,7 +89,7 @@ export default async function PurchaseDetailPage({
     notFound();
   }
 
-  const [services, history] = await Promise.all([
+  const [services, history, documents] = await Promise.all([
     prisma.service.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
@@ -105,6 +107,28 @@ export default async function PurchaseDetailPage({
         message: true,
         createdAt: true,
         actor: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    }),
+    prisma.purchaseRequestDocument.findMany({
+      where: { purchaseRequestId: purchase.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        documentType: true,
+        title: true,
+        supplier: true,
+        amount: true,
+        issuedAt: true,
+        reference: true,
+        fileName: true,
+        note: true,
+        createdAt: true,
+        createdBy: {
           select: {
             firstName: true,
             lastName: true,
@@ -134,6 +158,18 @@ export default async function PurchaseDetailPage({
       serviceId: session.user.serviceId,
     },
     purchase.serviceId
+  );
+  const canEditDocuments = canEditPurchaseDocuments(
+    {
+      id: session.user.id,
+      role: session.user.role,
+      serviceId: session.user.serviceId,
+    },
+    {
+      requesterId: purchase.requesterId,
+      serviceId: purchase.serviceId,
+      status: purchase.status,
+    }
   );
   const availableWorkflowStatuses = getPurchaseWorkflowTargets(purchase.status);
   const isClosed = isPurchaseClosed(purchase.status);
@@ -304,6 +340,36 @@ export default async function PurchaseDetailPage({
           </CardContent>
         </Card>
       </section>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Justificatifs</CardTitle>
+          <CardDescription>
+            Devis, tickets de caisse, factures et bons de commande rattaches a cette demande.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PurchaseDocumentsPanel
+            purchaseId={purchase.id}
+            disabled={!canEditDocuments}
+            documents={documents.map((document) => ({
+              id: document.id,
+              documentType: document.documentType,
+              title: document.title,
+              supplier: document.supplier,
+              amount: document.amount?.toString() ?? null,
+              issuedAt: document.issuedAt?.toISOString() ?? null,
+              reference: document.reference,
+              fileName: document.fileName,
+              note: document.note,
+              createdByName: document.createdBy
+                ? `${document.createdBy.firstName} ${document.createdBy.lastName}`
+                : null,
+              createdAt: document.createdAt.toISOString(),
+            }))}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -1,11 +1,8 @@
 import {
-  AlertTriangle,
-  BellRing,
   Boxes,
   ClipboardList,
   LayoutDashboard,
   ListChecks,
-  ShoppingCart,
   Mail,
   Settings2,
   Tags,
@@ -73,9 +70,3 @@ export const appNavigation: NavigationItem[] = [
 export function getNavigationForRole(role: Role) {
   return appNavigation.filter((item) => !item.roles || item.roles.includes(role));
 }
-
-export const topbarHighlights = [
-  { label: "Urgences", value: "3", icon: AlertTriangle },
-  { label: "Achats", value: "5", icon: ShoppingCart },
-  { label: "Alertes", value: "2", icon: BellRing },
-] as const;

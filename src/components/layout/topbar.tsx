@@ -6,11 +6,10 @@ import { ChevronRight, Menu, Search } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { appNavigation, topbarHighlights } from "./navigation";
+import { appNavigation } from "./navigation";
 
 const pageMeta: Record<string, { title: string; description: string }> = {
   "/dashboard": {
@@ -74,7 +73,7 @@ export function AppTopbar({ onOpenMobileNav, onSignOut, user }: AppTopbarProps) 
 
   return (
     <header className="border-b border-border bg-background">
-      <div className="flex flex-col gap-4 px-5 py-4 lg:px-8">
+      <div className="px-5 py-4 lg:px-8">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
             <Button
@@ -122,26 +121,6 @@ export function AppTopbar({ onOpenMobileNav, onSignOut, user }: AppTopbarProps) 
             <Avatar>{user.initials}</Avatar>
             <SignOutButton action={onSignOut} />
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {topbarHighlights.map((item) => (
-            <div
-              key={item.label}
-              className="inline-flex items-center gap-2 rounded-full bg-card px-2.5 py-1.5 shadow-sm shadow-black/5"
-            >
-              <div className="flex size-6 items-center justify-center rounded-full">
-                {"icon" in item && item.icon ? <item.icon className="size-3.5 bg-card" /> : null}
-              </div>
-              <span className="text-xs font-medium text-muted">{item.label}</span>
-              <Badge
-                variant="secondary"
-                className="min-w-6 bg-card justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none"
-              >
-                {item.value}
-              </Badge>
-            </div>
-          ))}
         </div>
       </div>
     </header>

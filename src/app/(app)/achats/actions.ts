@@ -12,11 +12,13 @@ import { createPurchaseHistoryEntry } from "@/lib/purchase-history";
 import { PURCHASE_STATUS_LABELS } from "@/lib/labels";
 import {
   canEditPurchaseDraft,
+  canEditPurchaseDocuments,
   canManagePurchaseWorkflow,
   generatePurchaseRequestNumber,
   getPurchaseVisibilityWhere,
   getPurchaseWorkflowTargets,
   isPurchaseClosed,
+  parsePurchaseDocumentTypeValue,
   parsePriorityValue,
   parsePurchaseStatusValue,
 } from "@/lib/purchases";
@@ -51,6 +53,16 @@ function toNullableBudget(value: FormDataEntryValue | null) {
 
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed.toFixed(2) : null;
+}
+
+function toNullableDate(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const date = new Date(`${normalized}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function formatStatusTransition(from: PurchaseStatus, to: PurchaseStatus) {
@@ -301,6 +313,202 @@ export async function updatePurchaseDraft(
   revalidatePath(`/achats/${purchaseId}`);
 
   return { success: "Brouillon mis a jour." };
+}
+
+export async function createPurchaseDocument(
+  purchaseId: string,
+  _previousState: PurchaseActionState,
+  formData: FormData
+): Promise<PurchaseActionState> {
+  void _previousState;
+  const session = await auth();
+
+  if (!session?.user || !session.user.isActive || session.user.status !== "active") {
+    return { error: "Session invalide. Merci de vous reconnecter." };
+  }
+
+  const documentType = parsePurchaseDocumentTypeValue(formData.get("documentType"));
+  const title = String(formData.get("title") ?? "").trim();
+  const supplier = toNullableString(formData.get("supplier"));
+  const amount = toNullableBudget(formData.get("amount"));
+  const issuedAt = toNullableDate(formData.get("issuedAt"));
+  const reference = toNullableString(formData.get("reference"));
+  const fileName = toNullableString(formData.get("fileName"));
+  const note = toNullableString(formData.get("note"));
+
+  if (!documentType) {
+    return { error: "Le type de justificatif est obligatoire." };
+  }
+
+  if (!title) {
+    return { error: "Le libelle du justificatif est obligatoire." };
+  }
+
+  const purchase = await prisma.purchaseRequest.findFirst({
+    where: {
+      id: purchaseId,
+      AND: [
+        getPurchaseVisibilityWhere({
+          id: session.user.id,
+          role: session.user.role,
+          serviceId: session.user.serviceId,
+        }),
+      ],
+    },
+    select: {
+      id: true,
+      requesterId: true,
+      serviceId: true,
+      status: true,
+      requestNumber: true,
+    },
+  });
+
+  if (!purchase) {
+    return { error: "Demande d'achat introuvable." };
+  }
+
+  if (
+    !canEditPurchaseDocuments(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        serviceId: session.user.serviceId,
+      },
+      purchase
+    )
+  ) {
+    return { error: "Vous ne pouvez pas modifier les justificatifs de cette demande." };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseRequestDocument.create({
+        data: {
+          purchaseRequestId: purchase.id,
+          documentType,
+          title,
+          supplier,
+          amount,
+          issuedAt,
+          reference,
+          fileName,
+          note,
+          createdById: session.user.id,
+        },
+      });
+
+      await createPurchaseHistoryEntry(tx, {
+        purchaseRequestId: purchase.id,
+        actorId: session.user.id,
+        action: "modification",
+        message: `Justificatif ajoute: ${title}.`,
+      });
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Ajout du justificatif impossible.",
+    };
+  }
+
+  revalidatePath("/achats");
+  revalidatePath(`/achats/${purchaseId}`);
+
+  return { success: "Justificatif ajoute." };
+}
+
+export async function deletePurchaseDocument(
+  purchaseId: string,
+  documentId: string,
+  _previousState: PurchaseActionState
+): Promise<PurchaseActionState> {
+  void _previousState;
+  const session = await auth();
+
+  if (!session?.user || !session.user.isActive || session.user.status !== "active") {
+    return { error: "Session invalide. Merci de vous reconnecter." };
+  }
+
+  const purchase = await prisma.purchaseRequest.findFirst({
+    where: {
+      id: purchaseId,
+      AND: [
+        getPurchaseVisibilityWhere({
+          id: session.user.id,
+          role: session.user.role,
+          serviceId: session.user.serviceId,
+        }),
+      ],
+    },
+    select: {
+      id: true,
+      requesterId: true,
+      serviceId: true,
+      status: true,
+    },
+  });
+
+  if (!purchase) {
+    return { error: "Demande d'achat introuvable." };
+  }
+
+  if (
+    !canEditPurchaseDocuments(
+      {
+        id: session.user.id,
+        role: session.user.role,
+        serviceId: session.user.serviceId,
+      },
+      purchase
+    )
+  ) {
+    return { error: "Vous ne pouvez pas modifier les justificatifs de cette demande." };
+  }
+
+  const document = await prisma.purchaseRequestDocument.findFirst({
+    where: {
+      id: documentId,
+      purchaseRequestId: purchase.id,
+    },
+    select: {
+      id: true,
+      title: true,
+    },
+  });
+
+  if (!document) {
+    return { error: "Justificatif introuvable." };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.purchaseRequestDocument.delete({
+        where: { id: document.id },
+      });
+
+      await createPurchaseHistoryEntry(tx, {
+        purchaseRequestId: purchase.id,
+        actorId: session.user.id,
+        action: "modification",
+        message: `Justificatif supprime: ${document.title}.`,
+      });
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Suppression du justificatif impossible.",
+    };
+  }
+
+  revalidatePath("/achats");
+  revalidatePath(`/achats/${purchaseId}`);
+
+  return { success: "Justificatif supprime." };
 }
 
 export async function submitPurchaseRequest(

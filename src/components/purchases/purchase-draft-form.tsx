@@ -53,14 +53,14 @@ export function PurchaseDraftForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <label htmlFor="title" className="text-sm font-medium text-foreground">
-          Objet
+          Objet de la depense
         </label>
         <Input id="title" name="title" defaultValue={purchase.title} required disabled={disabled} />
       </div>
 
       <div className="space-y-2">
         <label htmlFor="description" className="text-sm font-medium text-foreground">
-          Description
+          Besoin / contexte
         </label>
         <Textarea
           id="description"
@@ -74,13 +74,13 @@ export function PurchaseDraftForm({
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="supplier" className="text-sm font-medium text-foreground">
-            Fournisseur
+            Fournisseur pressenti
           </label>
           <Input id="supplier" name="supplier" defaultValue={purchase.supplier ?? ""} disabled={disabled} />
         </div>
         <div className="space-y-2">
           <label htmlFor="quantity" className="text-sm font-medium text-foreground">
-            Quantite
+            Quantite, si utile
           </label>
           <Input
             id="quantity"

@@ -68,6 +68,29 @@ function toggleDirection(currentKey: SortKey, currentDirection: SortDirection, n
   return currentDirection === "asc" ? "desc" : "asc";
 }
 
+function SortButton({
+  label,
+  column,
+  isActive,
+  onSort,
+}: {
+  label: string;
+  column: SortKey;
+  isActive: boolean;
+  onSort: (column: SortKey) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(column)}
+      className="inline-flex items-center gap-2 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted transition-colors hover:text-foreground"
+    >
+      <span>{label}</span>
+      <ArrowUpDown className={isActive ? "size-3.5 text-foreground" : "size-3.5"} />
+    </button>
+  );
+}
+
 export function PurchasesDataTable({ purchases }: PurchasesDataTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PurchaseStatus>("all");
@@ -144,21 +167,6 @@ export function PurchasesDataTable({ purchases }: PurchasesDataTableProps) {
     setSortKey(nextKey);
   }
 
-  function SortButton({ label, column }: { label: string; column: SortKey }) {
-    const isActive = sortKey === column;
-
-    return (
-      <button
-        type="button"
-        onClick={() => handleSort(column)}
-        className="inline-flex items-center gap-2 text-left text-xs font-semibold uppercase tracking-[0.12em] text-muted transition-colors hover:text-foreground"
-      >
-        <span>{label}</span>
-        <ArrowUpDown className={isActive ? "size-3.5 text-foreground" : "size-3.5"} />
-      </button>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -220,22 +228,52 @@ export function PurchasesDataTable({ purchases }: PurchasesDataTableProps) {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>
-                <SortButton label="Demande" column="requestNumber" />
+                <SortButton
+                  label="Demande"
+                  column="requestNumber"
+                  isActive={sortKey === "requestNumber"}
+                  onSort={handleSort}
+                />
               </TableHead>
               <TableHead>
-                <SortButton label="Titre" column="title" />
+                <SortButton
+                  label="Titre"
+                  column="title"
+                  isActive={sortKey === "title"}
+                  onSort={handleSort}
+                />
               </TableHead>
               <TableHead className="hidden lg:table-cell">
-                <SortButton label="Demandeur" column="requester" />
+                <SortButton
+                  label="Demandeur"
+                  column="requester"
+                  isActive={sortKey === "requester"}
+                  onSort={handleSort}
+                />
               </TableHead>
               <TableHead className="hidden xl:table-cell">
-                <SortButton label="Service" column="service" />
+                <SortButton
+                  label="Service"
+                  column="service"
+                  isActive={sortKey === "service"}
+                  onSort={handleSort}
+                />
               </TableHead>
               <TableHead className="hidden md:table-cell">
-                <SortButton label="Priorite" column="priority" />
+                <SortButton
+                  label="Priorite"
+                  column="priority"
+                  isActive={sortKey === "priority"}
+                  onSort={handleSort}
+                />
               </TableHead>
               <TableHead>
-                <SortButton label="Statut" column="status" />
+                <SortButton
+                  label="Statut"
+                  column="status"
+                  isActive={sortKey === "status"}
+                  onSort={handleSort}
+                />
               </TableHead>
             </TableRow>
           </TableHeader>
