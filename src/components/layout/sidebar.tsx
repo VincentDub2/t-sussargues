@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { startTransition, type MouseEvent, useOptimistic } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import type { Role } from "@/generated/prisma/client";
@@ -27,7 +28,29 @@ export function AppSidebar({
   onMobileClose,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const [optimisticPathname, setOptimisticPathname] = useOptimistic(pathname);
   const navigation = getNavigationForRole(role);
+  const activePathname = optimisticPathname;
+
+  const updateOptimisticPathname = (
+    event: MouseEvent<HTMLAnchorElement>,
+    href: string
+  ) => {
+    if (
+      event.defaultPrevented ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.button !== 0
+    ) {
+      return;
+    }
+
+    startTransition(() => {
+      setOptimisticPathname(href);
+    });
+  };
 
   return (
     <>
@@ -61,13 +84,14 @@ export function AppSidebar({
           {navigation.map((item) => {
             const isActive =
               item.href === "/dashboard"
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
+                ? activePathname === item.href
+                : activePathname.startsWith(item.href);
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={(event) => updateOptimisticPathname(event, item.href)}
                 className={cn(
                   "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors",
                   isActive
@@ -119,14 +143,17 @@ export function AppSidebar({
               {navigation.map((item) => {
                 const isActive =
                   item.href === "/dashboard"
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
+                    ? activePathname === item.href
+                    : activePathname.startsWith(item.href);
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={onMobileClose}
+                    onClick={(event) => {
+                      updateOptimisticPathname(event, item.href);
+                      onMobileClose();
+                    }}
                     className={cn(
                       "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors",
                       isActive
