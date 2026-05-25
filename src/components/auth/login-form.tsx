@@ -53,6 +53,7 @@ export function LoginForm() {
           placeholder="••••••••"
           value={password}
           onChange={setPassword}
+          showHints={false}
           required
         />
       </div>

@@ -14,7 +14,7 @@ export default async function InterventionsPage() {
     redirect("/login");
   }
 
-  const [interventions, statuses, categories, services, assignedCount] = await Promise.all([
+  const [interventions, statuses, categories, services, locations, assignedCount] = await Promise.all([
     prisma.intervention.findMany({
       where: getInterventionVisibilityWhere({
         id: session.user.id,
@@ -63,6 +63,10 @@ export default async function InterventionsPage() {
         id: true,
         name: true,
       },
+    }),
+    prisma.interventionLocation.findMany({
+      orderBy: { name: "asc" },
+      select: { name: true },
     }),
     prisma.intervention.count({
       where: {
@@ -118,6 +122,7 @@ export default async function InterventionsPage() {
               categories={categories}
               services={services}
               hasActiveStatus={hasActiveStatus}
+              locations={locations.map((location) => location.name)}
             />
           </CardHeader>
           <CardContent>

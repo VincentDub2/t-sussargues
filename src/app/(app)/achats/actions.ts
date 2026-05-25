@@ -8,13 +8,17 @@ import {
   sendPurchaseRejectedEmail,
   sendPurchaseValidatedEmail,
 } from "@/lib/email";
+import {
+  getFileStorage,
+  sanitizeStorageFileName,
+  type StoredFile,
+} from "@/lib/file-storage";
 import { createPurchaseHistoryEntry } from "@/lib/purchase-history";
 import { PURCHASE_STATUS_LABELS } from "@/lib/labels";
 import {
   canEditPurchaseDraft,
   canEditPurchaseDocuments,
   canManagePurchaseWorkflow,
-  generatePurchaseRequestNumber,
   getPurchaseVisibilityWhere,
   getPurchaseWorkflowTargets,
   isPurchaseClosed,
@@ -23,12 +27,26 @@ import {
   parsePurchaseStatusValue,
 } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
+import {
+  getNextPurchaseDocumentReference,
+  getNextReferenceNumber,
+} from "@/lib/reference-numbers";
 
 export type PurchaseActionState = {
   error?: string;
   success?: string;
   createdId?: string;
 };
+
+const MAX_PURCHASE_DOCUMENT_FILE_SIZE = 15 * 1024 * 1024;
+const ACCEPTED_PURCHASE_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+]);
 
 function toNullableString(value: FormDataEntryValue | null) {
   const normalized = String(value ?? "").trim();
@@ -67,6 +85,43 @@ function toNullableDate(value: FormDataEntryValue | null) {
 
 function formatStatusTransition(from: PurchaseStatus, to: PurchaseStatus) {
   return `${PURCHASE_STATUS_LABELS[from]} -> ${PURCHASE_STATUS_LABELS[to]}`;
+}
+
+function getOptionalFile(value: FormDataEntryValue | null) {
+  if (!(value instanceof File) || value.size === 0) {
+    return null;
+  }
+
+  return value;
+}
+
+function validatePurchaseDocumentFile(file: File) {
+  if (file.size > MAX_PURCHASE_DOCUMENT_FILE_SIZE) {
+    return "Le fichier ne doit pas depasser 15 Mo.";
+  }
+
+  if (
+    file.type &&
+    !file.type.startsWith("image/") &&
+    !ACCEPTED_PURCHASE_DOCUMENT_MIME_TYPES.has(file.type)
+  ) {
+    return "Format non accepte. Ajoutez un PDF, une image ou un document bureautique courant.";
+  }
+
+  return null;
+}
+
+function buildPurchaseDocumentPath({
+  requestNumber,
+  fileName,
+}: {
+  requestNumber: string;
+  fileName: string;
+}) {
+  const safeRequestNumber = sanitizeStorageFileName(requestNumber);
+  const safeFileName = sanitizeStorageFileName(fileName);
+
+  return `purchase-documents/${safeRequestNumber}/${Date.now()}-${safeFileName}`;
 }
 
 export async function createPurchaseRequest(
@@ -114,9 +169,14 @@ export async function createPurchaseRequest(
 
   try {
     const purchase = await prisma.$transaction(async (tx) => {
+      const requestNumber = await getNextReferenceNumber(tx, {
+        scope: "purchase",
+        prefix: "ACH",
+      });
+
       const createdPurchase = await tx.purchaseRequest.create({
         data: {
-          requestNumber: generatePurchaseRequestNumber(),
+          requestNumber,
           title,
           description,
           supplier,
@@ -333,7 +393,8 @@ export async function createPurchaseDocument(
   const amount = toNullableBudget(formData.get("amount"));
   const issuedAt = toNullableDate(formData.get("issuedAt"));
   const reference = toNullableString(formData.get("reference"));
-  const fileName = toNullableString(formData.get("fileName"));
+  const file = getOptionalFile(formData.get("file"));
+  const fileName = file?.name ?? toNullableString(formData.get("fileName"));
   const note = toNullableString(formData.get("note"));
 
   if (!documentType) {
@@ -342,6 +403,14 @@ export async function createPurchaseDocument(
 
   if (!title) {
     return { error: "Le libelle du justificatif est obligatoire." };
+  }
+
+  if (file) {
+    const fileError = validatePurchaseDocumentFile(file);
+
+    if (fileError) {
+      return { error: fileError };
+    }
   }
 
   const purchase = await prisma.purchaseRequest.findFirst({
@@ -381,8 +450,27 @@ export async function createPurchaseDocument(
     return { error: "Vous ne pouvez pas modifier les justificatifs de cette demande." };
   }
 
+  let uploadedFile: StoredFile | null = null;
+
   try {
+    if (file) {
+      uploadedFile = await getFileStorage().put({
+        file,
+        pathname: buildPurchaseDocumentPath({
+          requestNumber: purchase.requestNumber,
+          fileName: file.name,
+        }),
+      });
+    }
+
     await prisma.$transaction(async (tx) => {
+      const documentReference =
+        reference ??
+        (await getNextPurchaseDocumentReference(tx, {
+          purchaseId: purchase.id,
+          requestNumber: purchase.requestNumber,
+        }));
+
       await tx.purchaseRequestDocument.create({
         data: {
           purchaseRequestId: purchase.id,
@@ -391,8 +479,12 @@ export async function createPurchaseDocument(
           supplier,
           amount,
           issuedAt,
-          reference,
+          reference: documentReference,
           fileName,
+          filePath: uploadedFile?.pathname ?? null,
+          fileUrl: uploadedFile?.url ?? null,
+          mimeType: uploadedFile?.contentType ?? file?.type ?? null,
+          fileSize: uploadedFile?.size ?? file?.size ?? null,
           note,
           createdById: session.user.id,
         },
@@ -402,10 +494,14 @@ export async function createPurchaseDocument(
         purchaseRequestId: purchase.id,
         actorId: session.user.id,
         action: "modification",
-        message: `Justificatif ajoute: ${title}.`,
+        message: `Justificatif ajoute: ${title} (${documentReference}).`,
       });
     });
   } catch (error) {
+    if (uploadedFile) {
+      await getFileStorage().delete(uploadedFile.pathname).catch(() => undefined);
+    }
+
     return {
       error:
         error instanceof Error
@@ -476,6 +572,7 @@ export async function deletePurchaseDocument(
     select: {
       id: true,
       title: true,
+      filePath: true,
     },
   });
 
@@ -496,6 +593,10 @@ export async function deletePurchaseDocument(
         message: `Justificatif supprime: ${document.title}.`,
       });
     });
+
+    if (document.filePath) {
+      await getFileStorage().delete(document.filePath).catch(() => undefined);
+    }
   } catch (error) {
     return {
       error:

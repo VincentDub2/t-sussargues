@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Trash2 } from "lucide-react";
+import { Download, FileText, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -26,6 +26,9 @@ type PurchaseDocumentRecord = {
   issuedAt: string | null;
   reference: string | null;
   fileName: string | null;
+  mimeType: string | null;
+  fileSize: number | null;
+  downloadHref: string | null;
   note: string | null;
   createdByName: string | null;
   createdAt: string;
@@ -63,6 +66,20 @@ function formatDate(value: string | null) {
   }
 
   return new Date(value).toLocaleDateString("fr-FR");
+}
+
+function formatFileSize(value: number | null) {
+  if (!value) {
+    return null;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${Math.ceil(value / 1024).toLocaleString("fr-FR")} Ko`;
+  }
+
+  return `${(value / 1024 / 1024).toLocaleString("fr-FR", {
+    maximumFractionDigits: 1,
+  })} Mo`;
 }
 
 function AddDocumentButton({ disabled }: { disabled?: boolean }) {
@@ -148,10 +165,26 @@ export function PurchaseDocumentsPanel({
                     <p>{document.reference ?? "Reference non renseignee"}</p>
                   </div>
                   {document.fileName ? (
-                    <p className="inline-flex items-center gap-2 text-sm text-foreground">
-                      <FileText className="size-4 text-muted" />
-                      {document.fileName}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                      <span className="inline-flex min-w-0 items-center gap-2">
+                        <FileText className="size-4 shrink-0 text-muted" />
+                        <span className="truncate">{document.fileName}</span>
+                      </span>
+                      {formatFileSize(document.fileSize) ? (
+                        <span className="text-muted">
+                          {formatFileSize(document.fileSize)}
+                        </span>
+                      ) : null}
+                      {document.downloadHref ? (
+                        <a
+                          href={document.downloadHref}
+                          className="inline-flex items-center gap-1 font-medium text-primary hover:text-primary-deep"
+                        >
+                          <Download className="size-4" />
+                          Telecharger
+                        </a>
+                      ) : null}
+                    </div>
                   ) : null}
                   {document.note ? (
                     <p className="text-sm leading-6 text-muted">{document.note}</p>
@@ -177,7 +210,11 @@ export function PurchaseDocumentsPanel({
         )}
       </div>
 
-      <form ref={formRef} action={formAction} className="space-y-4">
+      <form
+        ref={formRef}
+        action={formAction}
+        className="space-y-4"
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="documentType" className="text-sm font-medium text-foreground">
@@ -227,7 +264,7 @@ export function PurchaseDocumentsPanel({
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="issuedAt" className="text-sm font-medium text-foreground">
               Date du document
@@ -241,18 +278,22 @@ export function PurchaseDocumentsPanel({
             </label>
             <Input id="reference" name="reference" disabled={disabled} />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <label htmlFor="fileName" className="text-sm font-medium text-foreground">
-              Nom du fichier
-            </label>
-            <Input
-              id="fileName"
-              name="fileName"
-              disabled={disabled}
-              placeholder="devis.pdf"
-            />
-          </div>
+        <div className="space-y-2">
+          <label htmlFor="file" className="text-sm font-medium text-foreground">
+            Fichier
+          </label>
+          <Input
+            id="file"
+            name="file"
+            type="file"
+            disabled={disabled}
+            accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt"
+          />
+          <p className="text-xs text-muted">
+            PDF, photo ou document bureautique. Taille maximale: 15 Mo.
+          </p>
         </div>
 
         <div className="space-y-2">

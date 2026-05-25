@@ -126,6 +126,9 @@ export default async function PurchaseDetailPage({
         issuedAt: true,
         reference: true,
         fileName: true,
+        filePath: true,
+        mimeType: true,
+        fileSize: true,
         note: true,
         createdAt: true,
         createdBy: {
@@ -361,6 +364,11 @@ export default async function PurchaseDetailPage({
               issuedAt: document.issuedAt?.toISOString() ?? null,
               reference: document.reference,
               fileName: document.fileName,
+              mimeType: document.mimeType,
+              fileSize: document.fileSize,
+              downloadHref: document.filePath
+                ? `/api/purchase-documents/${document.id}`
+                : null,
               note: document.note,
               createdByName: document.createdBy
                 ? `${document.createdBy.firstName} ${document.createdBy.lastName}`

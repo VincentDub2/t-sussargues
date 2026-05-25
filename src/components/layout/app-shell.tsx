@@ -9,6 +9,7 @@ import { AppTopbar } from "./topbar";
 
 type AppShellProps = {
   children: React.ReactNode;
+  initialCollapsed: boolean;
   user: {
     name: string;
     role: Role;
@@ -17,9 +18,26 @@ type AppShellProps = {
   onSignOut: () => Promise<void>;
 };
 
-export function AppShell({ children, user, onSignOut }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
+const SIDEBAR_COLLAPSED_COOKIE = "t-sussargues-sidebar-collapsed";
+
+export function AppShell({
+  children,
+  initialCollapsed,
+  user,
+  onSignOut,
+}: AppShellProps) {
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const toggleCollapsed = () => {
+    setCollapsed((value) => {
+      const nextValue = !value;
+      document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${String(
+        nextValue
+      )}; Path=/; Max-Age=31536000; SameSite=Lax`;
+
+      return nextValue;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -27,7 +45,7 @@ export function AppShell({ children, user, onSignOut }: AppShellProps) {
         <AppSidebar
           role={user.role}
           collapsed={collapsed}
-          onToggle={() => setCollapsed((value) => !value)}
+          onToggle={toggleCollapsed}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
         />

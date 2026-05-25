@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 import type { Prisma, Priority, Role } from "@/generated/prisma/client";
 
 type SessionUserLike = {
@@ -69,10 +67,6 @@ export function canEditIntervention(
     Boolean(user.serviceId) &&
     user.serviceId === intervention.serviceId
   );
-}
-
-export function generateInterventionTicketNumber(date = new Date()) {
-  return `INT-${date.getFullYear()}-${randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
 export function parsePriorityValue(value: FormDataEntryValue | null): Priority | null {

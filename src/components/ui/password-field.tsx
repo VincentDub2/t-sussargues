@@ -15,6 +15,7 @@ type PasswordFieldProps = Omit<React.ComponentProps<"input">, "type" | "value" |
   compareWith?: string;
   compareLabel?: string;
   helperText?: string;
+  showHints?: boolean;
 };
 
 function getStatusTone(isPositive: boolean, isNeutral: boolean) {
@@ -33,6 +34,7 @@ export function PasswordField({
   compareWith,
   compareLabel = "Correspondance",
   helperText,
+  showHints = true,
   ...props
 }: PasswordFieldProps) {
   const [isVisible, setIsVisible] = React.useState(false);
@@ -54,24 +56,26 @@ export function PasswordField({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted">{helperText ?? charactersLabel}</span>
-          <span className={cn("font-medium", getStatusTone(hasMinLength, value.length === 0))}>
-            {lengthStatusLabel}
-          </span>
+      {showHints ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted">{helperText ?? charactersLabel}</span>
+            <span className={cn("font-medium", getStatusTone(hasMinLength, value.length === 0))}>
+              {lengthStatusLabel}
+            </span>
+          </div>
+          {compareStatusLabel ? (
+            <span
+              className={cn(
+                "font-medium",
+                getStatusTone(hasMatch, value.length === 0)
+              )}
+            >
+              {compareLabel} : {compareStatusLabel}
+            </span>
+          ) : null}
         </div>
-        {compareStatusLabel ? (
-          <span
-            className={cn(
-              "font-medium",
-              getStatusTone(hasMatch, value.length === 0)
-            )}
-          >
-            {compareLabel} : {compareStatusLabel}
-          </span>
-        ) : null}
-      </div>
+      ) : null}
 
       <div className="relative">
         <Input

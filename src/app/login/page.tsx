@@ -1,10 +1,8 @@
-import Link from "next/link";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/auth/login-form";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function LoginPage() {
@@ -61,20 +59,8 @@ export default async function LoginPage() {
                 </CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent>
               <LoginForm />
-              <div className="flex flex-col gap-3">
-                <Link
-                  href="/dashboard"
-                  className={buttonVariants({
-                    variant: "outline",
-                    className: "w-full",
-                  })}
-                >
-                  Voir le shell cible
-                  <ArrowRight />
-                </Link>
-              </div>
             </CardContent>
           </Card>
         </div>

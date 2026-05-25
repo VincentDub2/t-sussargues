@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 import type {
   Prisma,
   Priority,
@@ -84,10 +82,6 @@ export function canEditPurchaseDraft(
   }
 
   return user.id === purchase.requesterId && editableStatuses.includes(purchase.status);
-}
-
-export function generatePurchaseRequestNumber(date = new Date()) {
-  return `ACH-${date.getFullYear()}-${randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
 export function parsePriorityValue(value: FormDataEntryValue | null): Priority | null {

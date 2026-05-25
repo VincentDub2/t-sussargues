@@ -453,7 +453,7 @@ export default async function DashboardPage() {
               <Link
                 href="/interventions"
                 className={buttonVariants({
-                  className: "w-full sm:w-auto text-primary-foreground hover:text-primary-foreground",
+                  className: "w-full font-bold !text-white hover:!text-white sm:w-auto",
                 })}
               >
                 Ouvrir les interventions

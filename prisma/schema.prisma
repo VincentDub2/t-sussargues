@@ -121,6 +121,16 @@ model InterventionStatus {
   @@index([isActive, displayOrder])
 }
 
+
+model InterventionLocation {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Intervention {
   id            String                @id @default(cuid())
   ticketNumber  String                @unique
@@ -286,6 +296,18 @@ model NotificationRecipient {
 
   @@index([eventId, isActive])
   @@index([email])
+}
+
+model ReferenceSequence {
+  id        String   @id @default(cuid())
+  scope     String
+  year      Int
+  nextValue Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scope, year])
+  @@index([scope])
 }
 
 enum Role {

@@ -67,7 +67,7 @@ export default async function InterventionDetailPage({
     notFound();
   }
 
-  const [categories, services, statuses, assignees, history] = await Promise.all([
+  const [categories, services, statuses, assignees, history, locations] = await Promise.all([
     prisma.interventionCategory.findMany({
       where: { isActive: true },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
@@ -115,6 +115,10 @@ export default async function InterventionDetailPage({
           },
         },
       },
+    }),
+    prisma.interventionLocation.findMany({
+      orderBy: { name: "asc" },
+      select: { name: true },
     }),
   ]);
 
@@ -248,6 +252,7 @@ export default async function InterventionDetailPage({
               }}
               categories={categories}
               services={services}
+              locations={locations.map((location) => location.name)}
               disabled={!canEdit}
             />
           </CardContent>

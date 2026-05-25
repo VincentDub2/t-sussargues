@@ -11,8 +11,7 @@ import {
 } from "@/app/(app)/interventions/actions";
 import type { Priority } from "@/generated/prisma/client";
 import {
-  OTHER_INTERVENTION_LOCATION_VALUE,
-  PREDEFINED_INTERVENTION_LOCATIONS,
+  OTHER_INTERVENTION_LOCATION_VALUE
 } from "@/lib/intervention-locations";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import { Button } from "@/components/ui/button";
@@ -24,6 +23,7 @@ type CreateInterventionFormProps = {
   categories: Array<{ id: string; name: string }>;
   services: Array<{ id: string; name: string }>;
   hasActiveStatus: boolean;
+  locations: string[];
 };
 
 const initialState: InterventionActionState = {};
@@ -43,11 +43,12 @@ export function CreateInterventionForm({
   categories,
   services,
   hasActiveStatus,
+  locations,
 }: CreateInterventionFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(createIntervention, initialState);
   const [locationPreset, setLocationPreset] = useState<string>(
-    PREDEFINED_INTERVENTION_LOCATIONS[0]
+    locations[0] ?? ""
   );
 
   useEffect(() => {
@@ -99,7 +100,7 @@ export function CreateInterventionForm({
           onChange={(event) => setLocationPreset(event.target.value)}
           required
         >
-          {PREDEFINED_INTERVENTION_LOCATIONS.map((location) => (
+          {locations.map((location) => (
             <option key={location} value={location}>
               {location}
             </option>

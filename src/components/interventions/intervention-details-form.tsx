@@ -8,8 +8,7 @@ import {
   updateInterventionDetails,
 } from "@/app/(app)/interventions/actions";
 import {
-  OTHER_INTERVENTION_LOCATION_VALUE,
-  PREDEFINED_INTERVENTION_LOCATIONS,
+  OTHER_INTERVENTION_LOCATION_VALUE
 } from "@/lib/intervention-locations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,7 @@ type InterventionDetailsFormProps = {
   };
   categories: Array<{ id: string; name: string }>;
   services: Array<{ id: string; name: string }>;
+  locations: string[];
   disabled?: boolean;
 };
 
@@ -46,13 +46,14 @@ export function InterventionDetailsForm({
   intervention,
   categories,
   services,
+  locations,
   disabled = false,
 }: InterventionDetailsFormProps) {
   const action = updateInterventionDetails.bind(null, intervention.id);
   const [state, formAction] = useActionState(action, initialState);
   const isKnownLocation =
     intervention.location !== null &&
-    (PREDEFINED_INTERVENTION_LOCATIONS as readonly string[]).includes(intervention.location);
+    locations.includes(intervention.location);
   const initialLocationPreset =
     isKnownLocation && intervention.location
       ? intervention.location
@@ -96,7 +97,7 @@ export function InterventionDetailsForm({
           required
         >
           <option value="">Choisir un lieu</option>
-          {PREDEFINED_INTERVENTION_LOCATIONS.map((location) => (
+          {locations.map((location) => (
             <option key={location} value={location}>
               {location}
             </option>

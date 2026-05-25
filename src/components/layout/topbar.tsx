@@ -44,6 +44,10 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Statuts d'intervention",
     description: "Gestion des statuts, de leur ordre et de leur activation.",
   },
+  "/admin/locations": {
+    title: "Lieux",
+    description: "Administration des lieux disponibles pour les tickets.",
+  },
   "/admin/notifications": {
     title: "Notifications",
     description: "Configuration des emails automatiques, de leurs templates et des tests d'envoi.",

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Mail,
+  MapPin,
   Settings2,
   Tags,
   Users2,
@@ -57,6 +58,12 @@ export const appNavigation: NavigationItem[] = [
     title: "Statuts",
     href: "/admin/statuses",
     icon: ListChecks,
+    roles: ["admin"],
+  },
+  {
+    title: "Lieux",
+    href: "/admin/locations",
+    icon: MapPin,
     roles: ["admin"],
   },
   {

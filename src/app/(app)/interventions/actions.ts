@@ -17,10 +17,10 @@ import { parseInterventionLocation } from "@/lib/intervention-locations";
 import {
   canEditIntervention,
   canManageInterventionWorkflow,
-  generateInterventionTicketNumber,
   parsePriorityValue,
 } from "@/lib/interventions";
 import { prisma } from "@/lib/prisma";
+import { getNextReferenceNumber } from "@/lib/reference-numbers";
 
 export type InterventionActionState = {
   error?: string;
@@ -93,9 +93,14 @@ export async function createIntervention(
 
   try {
     const intervention = await prisma.$transaction(async (tx) => {
+      const ticketNumber = await getNextReferenceNumber(tx, {
+        scope: "intervention",
+        prefix: "INT",
+      });
+
       const created = await tx.intervention.create({
         data: {
-          ticketNumber: generateInterventionTicketNumber(),
+          ticketNumber,
           title,
           description,
           location,

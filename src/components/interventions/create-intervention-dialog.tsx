@@ -18,12 +18,14 @@ type CreateInterventionDialogProps = {
   categories: Array<{ id: string; name: string }>;
   services: Array<{ id: string; name: string }>;
   hasActiveStatus: boolean;
+  locations: string[];
 };
 
 export function CreateInterventionDialog({
   categories,
   services,
   hasActiveStatus,
+  locations,
 }: CreateInterventionDialogProps) {
   return (
     <Dialog>
@@ -44,6 +46,7 @@ export function CreateInterventionDialog({
           categories={categories}
           services={services}
           hasActiveStatus={hasActiveStatus}
+          locations={locations}
         />
       </DialogContent>
     </Dialog>
