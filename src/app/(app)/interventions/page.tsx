@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { CreateInterventionDialog } from "@/components/interventions/create-intervention-dialog";
 import { InterventionsDataTable } from "@/components/interventions/interventions-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getInterventionVisibilityWhere, isInterventionManagerRole } from "@/lib/interventions";
+import { getInterventionVisibilityWhere } from "@/lib/interventions";
+import { getRolePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 export default async function InterventionsPage() {
@@ -14,13 +15,17 @@ export default async function InterventionsPage() {
     redirect("/login");
   }
 
+  const permissions = await getRolePermissions(session.user.role);
+  const interventionScope = {
+    id: session.user.id,
+    role: session.user.role,
+    serviceId: session.user.serviceId,
+    permissions,
+  };
+
   const [interventions, statuses, categories, services, locations, assignedCount] = await Promise.all([
     prisma.intervention.findMany({
-      where: getInterventionVisibilityWhere({
-        id: session.user.id,
-        role: session.user.role,
-        serviceId: session.user.serviceId,
-      }),
+      where: getInterventionVisibilityWhere(interventionScope),
       orderBy: [{ createdAt: "desc" }],
       include: {
         status: true,
@@ -77,7 +82,7 @@ export default async function InterventionsPage() {
   ]);
 
   const hasActiveStatus = statuses.length > 0;
-  const managerAccess = isInterventionManagerRole(session.user.role);
+  const managerAccess = permissions["intervention.manage"];
 
   return (
     <div className="space-y-6">
@@ -102,7 +107,7 @@ export default async function InterventionsPage() {
             <div className="rounded-lg border border-border bg-secondary p-4">
               <p className="text-sm text-muted">Capacite de pilotage</p>
               <p className="mt-2 text-sm font-medium text-foreground">
-                {managerAccess ? "Admin / responsable" : "Suivi standard"}
+                {managerAccess ? "Pilotage autorise" : "Suivi standard"}
               </p>
             </div>
           </CardContent>
@@ -118,12 +123,14 @@ export default async function InterventionsPage() {
                 Suivi des tickets visibles selon votre role et votre service.
               </CardDescription>
             </div>
-            <CreateInterventionDialog
-              categories={categories}
-              services={services}
-              hasActiveStatus={hasActiveStatus}
-              locations={locations.map((location) => location.name)}
-            />
+            {permissions["intervention.create"] ? (
+              <CreateInterventionDialog
+                categories={categories}
+                services={services}
+                hasActiveStatus={hasActiveStatus}
+                locations={locations.map((location) => location.name)}
+              />
+            ) : null}
           </CardHeader>
           <CardContent>
             <InterventionsDataTable

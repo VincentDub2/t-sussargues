@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { CreatePurchaseDialog } from "@/components/purchases/create-purchase-dialog";
 import { PurchasesDataTable } from "@/components/purchases/purchases-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPurchaseVisibilityWhere, isPurchaseManagerRole } from "@/lib/purchases";
+import { getRolePermissions } from "@/lib/permissions";
+import { getPurchaseVisibilityWhere } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
 
 export default async function AchatsPage() {
@@ -14,13 +15,22 @@ export default async function AchatsPage() {
     redirect("/login");
   }
 
+  const permissions = await getRolePermissions(session.user.role);
+  const purchaseScope = {
+    id: session.user.id,
+    role: session.user.role,
+    serviceId: session.user.serviceId,
+    permissions,
+  };
+  const submittedVisibility = permissions["purchase.view_all"]
+    ? {}
+    : session.user.serviceId
+      ? { serviceId: session.user.serviceId }
+      : { requesterId: "__none__" };
+
   const [purchases, services, submittedCount] = await Promise.all([
     prisma.purchaseRequest.findMany({
-      where: getPurchaseVisibilityWhere({
-        id: session.user.id,
-        role: session.user.role,
-        serviceId: session.user.serviceId,
-      }),
+      where: getPurchaseVisibilityWhere(purchaseScope),
       orderBy: [{ createdAt: "desc" }],
       include: {
         requester: {
@@ -47,16 +57,13 @@ export default async function AchatsPage() {
     prisma.purchaseRequest.count({
       where: {
         status: "soumise",
-        ...(session.user.role === "responsable_service" && session.user.serviceId
-          ? { serviceId: session.user.serviceId }
-          : {}),
+        ...submittedVisibility,
       },
     }),
   ]);
 
-  const canChooseService =
-    session.user.role === "admin" || session.user.role === "responsable_service";
-  const managerAccess = isPurchaseManagerRole(session.user.role);
+  const canChooseService = permissions["purchase.choose_service"];
+  const managerAccess = permissions["purchase.validate"];
 
   return (
     <div className="space-y-6">
@@ -95,14 +102,16 @@ export default async function AchatsPage() {
           <div>
             <CardTitle>Liste des demandes</CardTitle>
             <CardDescription>
-              Les responsables voient les demandes de leur service, les autres voient leurs propres brouillons et soumissions.
+              Les elus et administrateurs voient toutes les demandes, les responsables celles de leur service.
             </CardDescription>
           </div>
-          <CreatePurchaseDialog
-            services={services}
-            defaultServiceId={session.user.serviceId}
-            canChooseService={canChooseService}
-          />
+          {permissions["purchase.create"] ? (
+            <CreatePurchaseDialog
+              services={services}
+              defaultServiceId={session.user.serviceId}
+              canChooseService={canChooseService}
+            />
+          ) : null}
         </CardHeader>
         <CardContent>
           <PurchasesDataTable

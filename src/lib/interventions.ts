@@ -1,9 +1,11 @@
 import type { Prisma, Priority, Role } from "@/generated/prisma/client";
+import { canRoleByDefault, type PermissionKey, type PermissionSet } from "@/lib/permissions";
 
 type SessionUserLike = {
   id: string;
   role: Role;
   serviceId: string | null;
+  permissions?: PermissionSet;
 };
 
 type InterventionAccessTarget = {
@@ -15,10 +17,17 @@ type InterventionAccessTarget = {
 const MANAGER_ROLES: Role[] = ["admin", "responsable_service"];
 const PRIORITIES: Priority[] = ["basse", "normale", "haute", "urgente"];
 
+function hasInterventionPermission(
+  user: SessionUserLike,
+  permission: PermissionKey
+) {
+  return user.permissions?.[permission] ?? canRoleByDefault(user.role, permission);
+}
+
 export function getInterventionVisibilityWhere(
   user: SessionUserLike
 ): Prisma.InterventionWhereInput {
-  if (user.role === "admin") {
+  if (hasInterventionPermission(user, "intervention.view_all")) {
     return {};
   }
 
@@ -38,7 +47,11 @@ export function canManageInterventionWorkflow(
   user: SessionUserLike,
   interventionServiceId: string | null
 ) {
-  if (user.role === "admin") {
+  if (!hasInterventionPermission(user, "intervention.manage")) {
+    return false;
+  }
+
+  if (hasInterventionPermission(user, "intervention.view_all")) {
     return true;
   }
 
@@ -54,7 +67,10 @@ export function canEditIntervention(
   user: SessionUserLike,
   intervention: InterventionAccessTarget
 ) {
-  if (user.role === "admin") {
+  if (
+    hasInterventionPermission(user, "intervention.manage") &&
+    hasInterventionPermission(user, "intervention.view_all")
+  ) {
     return true;
   }
 
@@ -63,7 +79,7 @@ export function canEditIntervention(
   }
 
   return (
-    user.role === "responsable_service" &&
+    hasInterventionPermission(user, "intervention.manage") &&
     Boolean(user.serviceId) &&
     user.serviceId === intervention.serviceId
   );

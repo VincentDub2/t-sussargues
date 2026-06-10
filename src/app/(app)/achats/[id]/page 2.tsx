@@ -2,25 +2,19 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { PurchaseDocumentsPanel } from "@/components/purchases/purchase-documents-panel";
 import { PurchaseDraftForm } from "@/components/purchases/purchase-draft-form";
-import { PurchaseHistoryList } from "@/components/purchases/purchase-history-list";
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge";
 import { PurchaseWorkflowForm } from "@/components/purchases/purchase-workflow-form";
 import { SubmitPurchaseButton } from "@/components/purchases/submit-purchase-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { PRIORITY_LABELS } from "@/lib/labels";
-import { getRolePermissions } from "@/lib/permissions";
 import {
   canEditPurchaseDraft,
-  canEditPurchaseDocuments,
   canManagePurchaseWorkflow,
   getPurchaseVisibilityWhere,
   getPurchaseWorkflowTargets,
-  isPurchaseClosed,
 } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
 
@@ -51,19 +45,16 @@ export default async function PurchaseDetailPage({
   }
 
   const { id } = await params;
-  const permissions = await getRolePermissions(session.user.role);
-  const purchaseScope = {
-    id: session.user.id,
-    role: session.user.role,
-    serviceId: session.user.serviceId,
-    permissions,
-  };
 
   const purchase = await prisma.purchaseRequest.findFirst({
     where: {
       id,
       AND: [
-        getPurchaseVisibilityWhere(purchaseScope),
+        getPurchaseVisibilityWhere({
+          id: session.user.id,
+          role: session.user.role,
+          serviceId: session.user.serviceId,
+        }),
       ],
     },
     include: {
@@ -93,60 +84,21 @@ export default async function PurchaseDetailPage({
     notFound();
   }
 
-  const [services, history, documents] = await Promise.all([
-    prisma.service.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-      },
-    }),
-    prisma.purchaseRequestHistory.findMany({
-      where: { purchaseRequestId: purchase.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        action: true,
-        message: true,
-        createdAt: true,
-        actor: {
-          select: {
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    }),
-    prisma.purchaseRequestDocument.findMany({
-      where: { purchaseRequestId: purchase.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        documentType: true,
-        title: true,
-        supplier: true,
-        amount: true,
-        issuedAt: true,
-        reference: true,
-        fileName: true,
-        filePath: true,
-        mimeType: true,
-        fileSize: true,
-        note: true,
-        createdAt: true,
-        createdBy: {
-          select: {
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    }),
-  ]);
+  const services = await prisma.service.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
 
   const canEditDraft = canEditPurchaseDraft(
-    purchaseScope,
+    {
+      id: session.user.id,
+      role: session.user.role,
+      serviceId: session.user.serviceId,
+    },
     {
       requesterId: purchase.requesterId,
       serviceId: purchase.serviceId,
@@ -155,19 +107,14 @@ export default async function PurchaseDetailPage({
   );
 
   const canManage = canManagePurchaseWorkflow(
-    purchaseScope,
+    {
+      id: session.user.id,
+      role: session.user.role,
+      serviceId: session.user.serviceId,
+    },
     purchase.serviceId
   );
-  const canEditDocuments = canEditPurchaseDocuments(
-    purchaseScope,
-    {
-      requesterId: purchase.requesterId,
-      serviceId: purchase.serviceId,
-      status: purchase.status,
-    }
-  );
   const availableWorkflowStatuses = getPurchaseWorkflowTargets(purchase.status);
-  const isClosed = isPurchaseClosed(purchase.status);
 
   return (
     <div className="space-y-6">
@@ -234,7 +181,7 @@ export default async function PurchaseDetailPage({
               Retour a la liste
             </Link>
 
-            {purchase.status === "brouillon" || purchase.status === "informations_demandees" ? (
+            {purchase.status === "brouillon" ? (
               <SubmitPurchaseButton
                 purchaseId={purchase.id}
                 status={purchase.status}
@@ -243,12 +190,10 @@ export default async function PurchaseDetailPage({
             ) : null}
 
             <div className="rounded-lg border border-border bg-secondary p-4 text-sm text-muted">
-              {isClosed
-                ? "Cette demande est cloturee. Elle reste consultable, mais plus aucune modification n'est possible."
-                : canManage
-                ? "Vous pouvez valider, refuser, demander des informations ou cloturer selon l'etat de la demande."
+              {canManage
+                ? "Vous pouvez statuer sur cette demande lorsqu'elle est soumise."
                 : canEditDraft
-                  ? "Vous pouvez completer cette demande puis la soumettre ou la renvoyer pour validation."
+                  ? "Vous pouvez encore modifier ce brouillon avant sa soumission."
                   : "Cette demande est visible dans votre perimetre actuel."}
             </div>
           </CardContent>
@@ -258,9 +203,9 @@ export default async function PurchaseDetailPage({
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <CardTitle>Demande</CardTitle>
+            <CardTitle>Brouillon</CardTitle>
             <CardDescription>
-              Edition possible tant que la demande est en brouillon ou en attente d&apos;informations complementaires.
+              Edition possible uniquement tant que la demande reste en brouillon.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -285,29 +230,19 @@ export default async function PurchaseDetailPage({
           <CardHeader>
             <CardTitle>Validation</CardTitle>
             <CardDescription>
-              Workflow metier: soumission, informations complementaires, decision, puis cloture.
+              Workflow minimal: brouillon, puis soumise, puis validee ou refusee.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {availableWorkflowStatuses.length > 0 ? (
-              <PurchaseWorkflowForm
-                purchase={{
-                  id: purchase.id,
-                  status: purchase.status,
-                  validationComment: purchase.validationComment,
-                }}
-                availableStatuses={[...availableWorkflowStatuses]}
-                disabled={!canManage}
-              />
-            ) : (
-              <div className="rounded-lg border border-dashed border-border bg-secondary p-4 text-sm text-muted">
-                {isClosed
-                  ? "Cette demande est deja cloturee."
-                  : "Aucune action de workflow n'est disponible pour l'etat actuel de la demande."}
-              </div>
-            )}
-
-            <Separator />
+            <PurchaseWorkflowForm
+              purchase={{
+                id: purchase.id,
+                status: purchase.status,
+                validationComment: purchase.validationComment,
+              }}
+              availableStatuses={[...availableWorkflowStatuses]}
+              disabled={!canManage || purchase.status !== "soumise"}
+            />
 
             <div className="grid gap-3 text-sm text-muted">
               <div>
@@ -335,53 +270,6 @@ export default async function PurchaseDetailPage({
           </CardContent>
         </Card>
       </section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Justificatifs</CardTitle>
-          <CardDescription>
-            Devis, tickets de caisse, factures et bons de commande rattaches a cette demande.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PurchaseDocumentsPanel
-            purchaseId={purchase.id}
-            disabled={!canEditDocuments}
-            documents={documents.map((document) => ({
-              id: document.id,
-              documentType: document.documentType,
-              title: document.title,
-              supplier: document.supplier,
-              amount: document.amount?.toString() ?? null,
-              issuedAt: document.issuedAt?.toISOString() ?? null,
-              reference: document.reference,
-              fileName: document.fileName,
-              mimeType: document.mimeType,
-              fileSize: document.fileSize,
-              downloadHref: document.filePath
-                ? `/api/purchase-documents/${document.id}`
-                : null,
-              note: document.note,
-              createdByName: document.createdBy
-                ? `${document.createdBy.firstName} ${document.createdBy.lastName}`
-                : null,
-              createdAt: document.createdAt.toISOString(),
-            }))}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Historique</CardTitle>
-          <CardDescription>
-            Trace des validations, refus, demandes d&apos;informations et clotures sur cette demande d&apos;achat.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PurchaseHistoryList entries={history} />
-        </CardContent>
-      </Card>
     </div>
   );
 }

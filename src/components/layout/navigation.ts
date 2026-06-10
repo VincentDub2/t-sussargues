@@ -6,6 +6,7 @@ import {
   Mail,
   MapPin,
   Settings2,
+  ShieldCheck,
   Tags,
   Users2,
 } from "lucide-react";
@@ -40,6 +41,12 @@ export const appNavigation: NavigationItem[] = [
     title: "Utilisateurs",
     href: "/admin/users",
     icon: Users2,
+    roles: ["admin"],
+  },
+  {
+    title: "Droits",
+    href: "/admin/roles",
+    icon: ShieldCheck,
     roles: ["admin"],
   },
   {

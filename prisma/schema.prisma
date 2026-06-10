@@ -310,6 +310,19 @@ model ReferenceSequence {
   @@index([scope])
 }
 
+model RolePermission {
+  id         String   @id @default(cuid())
+  role       Role
+  permission String
+  enabled    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([role, permission])
+  @@index([role])
+  @@index([permission])
+}
+
 enum Role {
   admin
   elu
