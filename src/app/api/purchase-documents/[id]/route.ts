@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { auth } from "@/auth";
 import { getFileStorage } from "@/lib/file-storage";
+import { getRolePermissions } from "@/lib/permissions";
 import { getPurchaseVisibilityWhere } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
 
@@ -27,6 +28,7 @@ export async function GET(
   }
 
   const { id } = await params;
+  const permissions = await getRolePermissions(session.user.role);
   const document = await prisma.purchaseRequestDocument.findFirst({
     where: {
       id,
@@ -34,6 +36,7 @@ export async function GET(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       }),
     },
     select: {

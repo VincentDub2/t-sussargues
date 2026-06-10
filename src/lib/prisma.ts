@@ -17,6 +17,7 @@ const requiredDelegates = [
   "notificationEvent",
   "notificationTemplate",
   "notificationRecipient",
+  "rolePermission",
 ] as const;
 
 function getDatabaseUrl() {

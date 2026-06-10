@@ -19,6 +19,7 @@ import {
   canManageInterventionWorkflow,
   parsePriorityValue,
 } from "@/lib/interventions";
+import { getRolePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getNextReferenceNumber } from "@/lib/reference-numbers";
 
@@ -44,6 +45,11 @@ export async function createIntervention(
 
   if (!session?.user || !session.user.isActive || session.user.status !== "active") {
     return { error: "Session invalide. Merci de vous reconnecter." };
+  }
+
+  const permissions = await getRolePermissions(session.user.role);
+  if (!permissions["intervention.create"]) {
+    return { error: "Vous n'avez pas les droits pour creer une intervention." };
   }
 
   const title = String(formData.get("title") ?? "").trim();
@@ -161,6 +167,7 @@ export async function updateInterventionDetails(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const location = parseInterventionLocation(formData);
@@ -206,6 +213,7 @@ export async function updateInterventionDetails(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       intervention
     )
@@ -331,6 +339,7 @@ export async function updateInterventionWorkflow(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const statusId = String(formData.get("statusId") ?? "").trim();
   const assignedToId = toNullableString(formData.get("assignedToId"));
   const priority = parsePriorityValue(formData.get("priority"));
@@ -372,12 +381,13 @@ export async function updateInterventionWorkflow(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       intervention.serviceId
     )
   ) {
     return {
-      error: "Seuls un administrateur ou un responsable de service peuvent piloter ce ticket.",
+      error: "Vous n'avez pas les droits pour piloter ce ticket.",
     };
   }
 

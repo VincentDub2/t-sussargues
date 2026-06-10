@@ -15,6 +15,7 @@ import {
 } from "@/lib/file-storage";
 import { createPurchaseHistoryEntry } from "@/lib/purchase-history";
 import { PURCHASE_STATUS_LABELS } from "@/lib/labels";
+import { getRolePermissions } from "@/lib/permissions";
 import {
   canEditPurchaseDraft,
   canEditPurchaseDocuments,
@@ -135,6 +136,11 @@ export async function createPurchaseRequest(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
+  if (!permissions["purchase.create"]) {
+    return { error: "Vous n'avez pas les droits pour creer une demande d'achat." };
+  }
+
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const supplier = toNullableString(formData.get("supplier"));
@@ -148,9 +154,7 @@ export async function createPurchaseRequest(
   }
 
   const serviceId =
-    session.user.role === "admin" || session.user.role === "responsable_service"
-      ? requestedServiceId
-      : session.user.serviceId;
+    permissions["purchase.choose_service"] ? requestedServiceId : session.user.serviceId;
 
   if (requestedServiceId && serviceId !== requestedServiceId) {
     return { error: "Vous ne pouvez pas creer une demande pour un autre service." };
@@ -230,6 +234,7 @@ export async function updatePurchaseDraft(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const supplier = toNullableString(formData.get("supplier"));
@@ -250,6 +255,7 @@ export async function updatePurchaseDraft(
           id: session.user.id,
           role: session.user.role,
           serviceId: session.user.serviceId,
+          permissions,
         }),
       ],
     },
@@ -277,6 +283,7 @@ export async function updatePurchaseDraft(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       purchase
     )
@@ -287,9 +294,7 @@ export async function updatePurchaseDraft(
   }
 
   const serviceId =
-    session.user.role === "admin" || session.user.role === "responsable_service"
-      ? requestedServiceId
-      : session.user.serviceId;
+    permissions["purchase.choose_service"] ? requestedServiceId : session.user.serviceId;
 
   if (requestedServiceId && serviceId !== requestedServiceId) {
     return { error: "Vous ne pouvez pas basculer cette demande vers un autre service." };
@@ -387,6 +392,7 @@ export async function createPurchaseDocument(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const documentType = parsePurchaseDocumentTypeValue(formData.get("documentType"));
   const title = String(formData.get("title") ?? "").trim();
   const supplier = toNullableString(formData.get("supplier"));
@@ -421,6 +427,7 @@ export async function createPurchaseDocument(
           id: session.user.id,
           role: session.user.role,
           serviceId: session.user.serviceId,
+          permissions,
         }),
       ],
     },
@@ -443,6 +450,7 @@ export async function createPurchaseDocument(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       purchase
     )
@@ -528,6 +536,7 @@ export async function deletePurchaseDocument(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const purchase = await prisma.purchaseRequest.findFirst({
     where: {
       id: purchaseId,
@@ -536,6 +545,7 @@ export async function deletePurchaseDocument(
           id: session.user.id,
           role: session.user.role,
           serviceId: session.user.serviceId,
+          permissions,
         }),
       ],
     },
@@ -557,6 +567,7 @@ export async function deletePurchaseDocument(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       purchase
     )
@@ -623,6 +634,7 @@ export async function submitPurchaseRequest(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const purchase = await prisma.purchaseRequest.findFirst({
     where: {
       id: purchaseId,
@@ -631,6 +643,7 @@ export async function submitPurchaseRequest(
           id: session.user.id,
           role: session.user.role,
           serviceId: session.user.serviceId,
+          permissions,
         }),
       ],
     },
@@ -652,6 +665,7 @@ export async function submitPurchaseRequest(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       purchase
     )
@@ -707,6 +721,7 @@ export async function updatePurchaseStatus(
     return { error: "Session invalide. Merci de vous reconnecter." };
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const status = parsePurchaseStatusValue(formData.get("status"));
   const validationComment = toNullableString(formData.get("validationComment"));
 
@@ -718,6 +733,7 @@ export async function updatePurchaseStatus(
           id: session.user.id,
           role: session.user.role,
           serviceId: session.user.serviceId,
+          permissions,
         }),
       ],
     },
@@ -752,12 +768,14 @@ export async function updatePurchaseStatus(
         id: session.user.id,
         role: session.user.role,
         serviceId: session.user.serviceId,
+        permissions,
       },
       purchase.serviceId
     )
   ) {
     return {
-      error: "Seuls un administrateur ou un responsable du service peuvent valider cette demande.",
+      error:
+        "Seuls un administrateur, un elu ou un responsable du service peuvent valider cette demande.",
     };
   }
 

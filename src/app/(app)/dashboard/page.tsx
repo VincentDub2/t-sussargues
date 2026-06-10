@@ -26,7 +26,8 @@ import {
   PURCHASE_HISTORY_ACTION_LABELS,
 } from "@/lib/purchase-history";
 import { getInterventionVisibilityWhere } from "@/lib/interventions";
-import { getPurchaseVisibilityWhere, isPurchaseManagerRole } from "@/lib/purchases";
+import { getRolePermissions } from "@/lib/permissions";
+import { getPurchaseVisibilityWhere } from "@/lib/purchases";
 import { prisma } from "@/lib/prisma";
 
 function formatDateTime(value: Date) {
@@ -79,15 +80,22 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  const permissions = await getRolePermissions(session.user.role);
   const scope = {
     id: session.user.id,
     role: session.user.role,
     serviceId: session.user.serviceId,
+    permissions,
   };
 
   const interventionVisibility = getInterventionVisibilityWhere(scope);
   const purchaseVisibility = getPurchaseVisibilityWhere(scope);
-  const canManagePurchases = isPurchaseManagerRole(session.user.role);
+  const canManagePurchases = permissions["purchase.validate"];
+  const submittedVisibility = permissions["purchase.view_all"]
+    ? {}
+    : session.user.serviceId
+      ? { serviceId: session.user.serviceId }
+      : { requesterId: "__none__" };
 
   const [
     openInterventionsCount,
@@ -145,9 +153,7 @@ export default async function DashboardPage() {
       ? prisma.purchaseRequest.count({
           where: {
             status: "soumise",
-            ...(session.user.role === "responsable_service" && session.user.serviceId
-              ? { serviceId: session.user.serviceId }
-              : {}),
+            ...submittedVisibility,
           },
         })
       : Promise.resolve(0),
@@ -438,7 +444,7 @@ export default async function DashboardPage() {
                   <p className="font-medium text-foreground">
                     {canManagePurchases
                       ? `${validationsToTreatCount} validation(s) achat a traiter`
-                      : "Validation achat reservee aux managers"}
+                      : "Validation achat reservee aux validateurs"}
                   </p>
                   <p className="text-sm leading-6 text-muted">
                     {canManagePurchases

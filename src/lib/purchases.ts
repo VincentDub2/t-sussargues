@@ -5,11 +5,13 @@ import type {
   PurchaseStatus,
   Role,
 } from "@/generated/prisma/client";
+import { canRoleByDefault, type PermissionKey, type PermissionSet } from "@/lib/permissions";
 
 type SessionUserLike = {
   id: string;
   role: Role;
   serviceId: string | null;
+  permissions?: PermissionSet;
 };
 
 type PurchaseAccessTarget = {
@@ -18,7 +20,7 @@ type PurchaseAccessTarget = {
   status: PurchaseStatus;
 };
 
-const MANAGER_ROLES: Role[] = ["admin", "responsable_service"];
+const MANAGER_ROLES: Role[] = ["admin", "elu", "responsable_service"];
 const PRIORITIES: Priority[] = ["basse", "normale", "haute", "urgente"];
 const PURCHASE_STATUSES: PurchaseStatus[] = [
   "brouillon",
@@ -39,10 +41,17 @@ const PURCHASE_DOCUMENT_TYPES: PurchaseDocumentType[] = [
   "autre",
 ];
 
+function hasPurchasePermission(
+  user: SessionUserLike,
+  permission: PermissionKey
+) {
+  return user.permissions?.[permission] ?? canRoleByDefault(user.role, permission);
+}
+
 export function getPurchaseVisibilityWhere(
   user: SessionUserLike
 ): Prisma.PurchaseRequestWhereInput {
-  if (user.role === "admin") {
+  if (hasPurchasePermission(user, "purchase.view_all")) {
     return {};
   }
 
@@ -59,7 +68,11 @@ export function canManagePurchaseWorkflow(
   user: SessionUserLike,
   purchaseServiceId: string | null
 ) {
-  if (user.role === "admin") {
+  if (!hasPurchasePermission(user, "purchase.validate")) {
+    return false;
+  }
+
+  if (hasPurchasePermission(user, "purchase.view_all")) {
     return true;
   }
 
@@ -148,6 +161,7 @@ export function canEditPurchaseDocuments(
 
   return (
     canEditPurchaseDraft(user, purchase) ||
-    canManagePurchaseWorkflow(user, purchase.serviceId)
+    (hasPurchasePermission(user, "purchase.documents") &&
+      canManagePurchaseWorkflow(user, purchase.serviceId))
   );
 }
