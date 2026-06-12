@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, LoaderCircle, LockKeyhole, Minus } from "lucide-react";
 
@@ -27,7 +27,7 @@ function ToggleSubmitButton({
 }: {
   currentEnabled: boolean;
   isLocked: boolean;
-  onOptimisticToggle: () => void;
+  onOptimisticToggle: (nextEnabled: boolean) => void;
 }) {
   const { pending } = useFormStatus();
 
@@ -37,7 +37,7 @@ function ToggleSubmitButton({
       disabled={isLocked || pending}
       onClick={() => {
         if (!isLocked && !pending) {
-          onOptimisticToggle();
+          onOptimisticToggle(!currentEnabled);
         }
       }}
       title={isLocked ? "Le role administrateur est verrouille" : undefined}
@@ -74,6 +74,7 @@ export function PermissionToggleButton({
   enabled,
 }: PermissionToggleButtonProps) {
   const [currentEnabled, setCurrentEnabled] = useState(enabled);
+  const enabledInputRef = useRef<HTMLInputElement>(null);
   const isLocked = role === "admin";
 
   async function submitPermissionChange(
@@ -94,15 +95,24 @@ export function PermissionToggleButton({
     initialState
   );
 
-  function optimisticToggle() {
-    setCurrentEnabled((value) => !value);
+  function optimisticToggle(nextEnabled: boolean) {
+    if (enabledInputRef.current) {
+      enabledInputRef.current.value = String(nextEnabled);
+    }
+
+    setCurrentEnabled(nextEnabled);
   }
 
   return (
     <form action={formAction} className="flex flex-col items-center gap-1">
       <input type="hidden" name="role" value={role} />
       <input type="hidden" name="permission" value={permission} />
-      <input type="hidden" name="enabled" value={String(!currentEnabled)} />
+      <input
+        ref={enabledInputRef}
+        type="hidden"
+        name="enabled"
+        defaultValue={String(!enabled)}
+      />
       <ToggleSubmitButton
         currentEnabled={currentEnabled}
         isLocked={isLocked}
