@@ -42,6 +42,8 @@ type CreatedIntervention = {
   title: string;
 };
 
+const initialAssistantMessage = "Assistant intervention pret.";
+
 function createMessage(role: ChatMessage["role"], content: string): ChatMessage {
   return {
     id: globalThis.crypto.randomUUID(),
@@ -75,7 +77,7 @@ export function InterventionChatLauncher({
     useState<CreatedIntervention | null>(null);
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    createMessage("assistant", "Assistant intervention pret."),
+    createMessage("assistant", initialAssistantMessage),
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -168,6 +170,37 @@ export function InterventionChatLauncher({
     }
   }
 
+  async function handleResetSession() {
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await fetch("/api/agent/intervention", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset" }),
+      }).then(readApiResponse);
+
+      setInput("");
+      setDraft(null);
+      setCreatedIntervention(null);
+      setMessages([createMessage("assistant", initialAssistantMessage)]);
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        createMessage(
+          "assistant",
+          error instanceof Error ? error.message : "Impossible de reinitialiser la session."
+        ),
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const chatPanel = (
     <SheetContent
       showCloseButton={false}
@@ -187,14 +220,25 @@ export function InterventionChatLauncher({
               </SheetDescription>
             </div>
           </div>
-          <button
-            type="button"
-            className="rounded-md p-2 text-primary-foreground/80 transition hover:bg-primary-deep hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            onClick={() => setOpen(false)}
-            aria-label="Fermer l'assistant"
-          >
-            <X className="size-5" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              className="rounded-md p-2 text-primary-foreground/80 transition hover:bg-primary-deep hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleResetSession}
+              disabled={loading}
+              aria-label="Reinitialiser la conversation"
+            >
+              <RotateCcw className="size-5" />
+            </button>
+            <button
+              type="button"
+              className="rounded-md p-2 text-primary-foreground/80 transition hover:bg-primary-deep hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              onClick={() => setOpen(false)}
+              aria-label="Fermer l'assistant"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
