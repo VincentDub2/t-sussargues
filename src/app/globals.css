@@ -60,3 +60,63 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+[data-slot="sheet-overlay"][data-state="open"] {
+  animation: sheet-overlay-in 160ms ease-out both;
+}
+
+[data-slot="sheet-overlay"][data-state="closed"] {
+  animation: sheet-overlay-out 140ms ease-in both;
+}
+
+[data-slot="sheet-content"] {
+  transform: translateX(0);
+}
+
+[data-slot="sheet-content"][data-state="open"] {
+  animation: sheet-content-in 240ms ease-out both;
+}
+
+[data-slot="sheet-content"][data-state="closed"] {
+  animation: sheet-content-out 180ms ease-in both;
+}
+
+@keyframes sheet-content-in {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheet-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-overlay-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-content-out {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
