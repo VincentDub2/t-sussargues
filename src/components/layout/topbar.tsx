@@ -28,6 +28,14 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Utilisateurs",
     description: "Base administrative pour l'administration des comptes.",
   },
+  "/admin/users/invitations": {
+    title: "Invitations",
+    description: "Historique pagine des invitations utilisateur.",
+  },
+  "/admin/users/logs": {
+    title: "Logs d'invitation",
+    description: "Historique pagine des emails d'invitation utilisateur.",
+  },
   "/admin/users/invite": {
     title: "Invitation utilisateur",
     description: "Creation d'un nouveau compte par invitation email controlee.",

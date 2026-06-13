@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 
 import { auth } from "@/auth";
+import { RecentInvitationsList } from "@/components/admin/invitations-table";
 import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
 import { UsersDataTable } from "@/components/admin/users-data-table";
 import { PageShell } from "@/components/layout/page-shell";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Role } from "@/generated/prisma/client";
-import { ROLE_LABELS } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
+
+const RECENT_INVITATIONS_LIMIT = 5;
 
 const invitationRoles: Role[] = [
   "admin",
@@ -20,26 +22,6 @@ const invitationRoles: Role[] = [
   "lecture",
 ];
 
-function getInvitationState(invitation: {
-  acceptedAt: Date | null;
-  cancelledAt: Date | null;
-  expiresAt: Date;
-}) {
-  if (invitation.acceptedAt) {
-    return "Acceptee";
-  }
-
-  if (invitation.cancelledAt) {
-    return "Annulee";
-  }
-
-  if (invitation.expiresAt < new Date()) {
-    return "Expiree";
-  }
-
-  return "En attente";
-}
-
 export default async function AdminUsersPage() {
   const session = await auth();
 
@@ -47,7 +29,8 @@ export default async function AdminUsersPage() {
     redirect("/dashboard");
   }
 
-  const [users, services, invitations, invitationLogs] = await Promise.all([
+  const now = new Date();
+  const [users, services, invitations] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -64,17 +47,23 @@ export default async function AdminUsersPage() {
     }),
     prisma.userInvitation.findMany({
       orderBy: { createdAt: "desc" },
-      take: 10,
-      include: {
-        service: true,
+      take: RECENT_INVITATIONS_LIMIT,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        service: {
+          select: {
+            name: true,
+          },
+        },
+        expiresAt: true,
+        acceptedAt: true,
+        cancelledAt: true,
+        createdAt: true,
       },
-    }),
-    prisma.notificationLog.findMany({
-      where: {
-        event: "user_invitation",
-      },
-      orderBy: { createdAt: "desc" },
-      take: 8,
     }),
   ]);
 
@@ -123,59 +112,44 @@ export default async function AdminUsersPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Invitations recentes</CardTitle>
+          <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <CardTitle>Invitations recentes</CardTitle>
+              <CardDescription>
+                Les {RECENT_INVITATIONS_LIMIT} dernieres invitations envoyees.
+              </CardDescription>
+            </div>
+            <Link
+              href="/admin/users/invitations"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Voir plus
+              <ArrowRight />
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {invitations.length > 0 ? (
-              invitations.map((invitation) => (
-                <div key={invitation.id} className="rounded-lg border border-border p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">
-                      {invitation.firstName} {invitation.lastName}
-                    </p>
-                    <Badge variant="outline">{getInvitationState(invitation)}</Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-muted">{invitation.email}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {ROLE_LABELS[invitation.role]}
-                    {invitation.service ? ` · ${invitation.service.name}` : ""}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted">Aucune invitation pour le moment.</p>
-            )}
+          <CardContent>
+            <RecentInvitationsList invitations={invitations} now={now} />
           </CardContent>
         </Card>
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Logs d&apos;invitation</CardTitle>
+        <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <CardTitle>Diagnostic email</CardTitle>
+            <CardDescription>
+              Les invitations recentes affichent le suivi metier. Les logs techniques d&apos;envoi sont consultables separement.
+            </CardDescription>
+          </div>
+          <Link
+            href="/admin/users/logs"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Voir tous les logs
+          </Link>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {invitationLogs.length > 0 ? (
-            invitationLogs.map((log) => (
-              <div key={log.id} className="rounded-lg border border-border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{log.recipient}</p>
-                  <Badge variant="outline">{log.status}</Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted">{log.subject}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {log.createdAt.toLocaleString("fr-FR")}
-                </p>
-                {log.errorMessage ? (
-                  <div className="mt-3 rounded border border-border bg-secondary px-3 py-2 font-mono text-xs text-foreground">
-                    {log.errorMessage}
-                  </div>
-                ) : null}
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-muted">Aucun log d&apos;invitation pour le moment.</p>
-          )}
+        <CardContent className="text-sm leading-6 text-muted">
+          Consultez cette page uniquement pour verifier les envois SMTP, les previsualisations et les erreurs de livraison des emails d&apos;invitation.
         </CardContent>
       </Card>
     </PageShell>
