@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { InterventionChatLauncher } from "@/components/agent/intervention-chat-launcher";
 import { CreateInterventionDialog } from "@/components/interventions/create-intervention-dialog";
 import { InterventionsDataTable } from "@/components/interventions/interventions-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,12 +125,15 @@ export default async function InterventionsPage() {
               </CardDescription>
             </div>
             {permissions["intervention.create"] ? (
-              <CreateInterventionDialog
-                categories={categories}
-                services={services}
-                hasActiveStatus={hasActiveStatus}
-                locations={locations.map((location) => location.name)}
-              />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <InterventionChatLauncher variant="inline" />
+                <CreateInterventionDialog
+                  categories={categories}
+                  services={services}
+                  hasActiveStatus={hasActiveStatus}
+                  locations={locations.map((location) => location.name)}
+                />
+              </div>
             ) : null}
           </CardHeader>
           <CardContent>
