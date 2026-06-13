@@ -1,13 +1,20 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { NotificationEventCard } from "@/components/admin/notification-event-card";
+import { NotificationLogsTable } from "@/components/admin/notification-logs-table";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  ensureNotificationCatalog,
-  NOTIFICATION_EVENT_DEFINITIONS,
-} from "@/lib/notifications";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { getNotificationAdminSummary } from "@/lib/notification-admin";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminNotificationsPage() {
@@ -17,44 +24,13 @@ export default async function AdminNotificationsPage() {
     redirect("/dashboard");
   }
 
-  await ensureNotificationCatalog();
-
-  const [events, recentLogs] = await Promise.all([
-    prisma.notificationEvent.findMany({
-      include: {
-        template: true,
-        recipients: {
-          orderBy: [{ createdAt: "asc" }],
-        },
-      },
-    }),
+  const [summary, recentLogs] = await Promise.all([
+    getNotificationAdminSummary(),
     prisma.notificationLog.findMany({
-      where: {
-        event: {
-          in: [...NOTIFICATION_EVENT_DEFINITIONS.map((item) => item.key)],
-        },
-      },
       orderBy: { createdAt: "desc" },
-      take: 16,
+      take: 5,
     }),
   ]);
-
-  const eventsByKey = new Map(events.map((event) => [event.key, event]));
-  const orderedEvents = NOTIFICATION_EVENT_DEFINITIONS.map((definition) => {
-    const event = eventsByKey.get(definition.key);
-
-    if (!event) {
-      return null;
-    }
-
-    return {
-      ...event,
-      placeholders: definition.placeholders,
-    };
-  }).filter(Boolean);
-
-  const enabledCount = events.filter((event) => event.isActive).length;
-  const disabledCount = events.length - enabledCount;
 
   return (
     <div className="space-y-6">
@@ -70,15 +46,15 @@ export default async function AdminNotificationsPage() {
           <CardContent className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-border bg-secondary p-4">
               <p className="text-sm text-muted">Evenements configures</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">{events.length}</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{summary.totalCount}</p>
             </div>
             <div className="rounded-lg border border-border bg-secondary p-4">
               <p className="text-sm text-muted">Actifs</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">{enabledCount}</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{summary.enabledCount}</p>
             </div>
             <div className="rounded-lg border border-border bg-secondary p-4">
               <p className="text-sm text-muted">Desactives</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">{disabledCount}</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{summary.disabledCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -98,50 +74,91 @@ export default async function AdminNotificationsPage() {
         </Card>
       </section>
 
-      <section className="space-y-4">
-        {orderedEvents.map((event) =>
-          event ? (
-            <NotificationEventCard
-              key={event.id}
-              event={event}
-              placeholders={event.placeholders}
-            />
-          ) : null
-        )}
-      </section>
-
       <Card>
         <CardHeader>
-          <CardTitle>Logs recents</CardTitle>
+          <CardTitle>Evenements</CardTitle>
           <CardDescription>
-            Historique recent des envois, previsualisations et erreurs de notifications.
+            Liste compacte des notifications configurees. Ouvrez un evenement pour modifier son template, ses destinataires ou envoyer un test.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {recentLogs.length > 0 ? (
-            recentLogs.map((log) => (
-              <div key={log.id} className="rounded-lg border border-border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium text-foreground">{log.recipient}</p>
-                  <Badge variant="outline">{log.status}</Badge>
-                  <Badge variant="outline">{log.event}</Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted">{log.subject}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {log.createdAt.toLocaleString("fr-FR")}
-                </p>
-                {log.errorMessage ? (
-                  <div className="mt-3 rounded border border-border bg-secondary px-3 py-2 font-mono text-xs text-foreground">
-                    {log.errorMessage}
-                  </div>
-                ) : null}
-              </div>
-            ))
-          ) : (
-            <div className="rounded-lg border border-dashed border-border bg-secondary p-4 text-sm text-muted">
-              Aucun log de notification pour le moment.
-            </div>
-          )}
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Evenement</TableHead>
+                <TableHead>Etat</TableHead>
+                <TableHead>Template</TableHead>
+                <TableHead>Destinataires</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {summary.events.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-foreground">{event.label}</p>
+                        <Badge variant="outline">{event.key}</Badge>
+                      </div>
+                      <p className="max-w-2xl text-sm leading-6 text-muted">
+                        {event.description}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={event.isActive ? "bg-success text-white" : "bg-secondary text-foreground"}>
+                      {event.isActive ? "Actif" : "Desactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs">
+                    <p className="truncate text-sm text-foreground">
+                      {event.template?.subject ?? "Template manquant"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {event.placeholders.length} placeholders
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-foreground">
+                      {event._count.recipients}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/admin/notifications/${event.key}`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Ouvrir
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <CardTitle>Logs recents</CardTitle>
+            <CardDescription>
+              Les 5 derniers envois, previsualisations et erreurs de notifications.
+            </CardDescription>
+          </div>
+          <Link
+            href="/admin/notifications/logs"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Voir tous les logs
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <NotificationLogsTable
+            logs={recentLogs}
+            emptyMessage="Aucun log de notification pour le moment."
+          />
         </CardContent>
       </Card>
     </div>

@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
 import { auth } from "@/auth";
 import { sendTestNotificationEmail } from "@/lib/email";
+import { NOTIFICATION_CONFIG_CACHE_TAG } from "@/lib/notification-admin";
 import { ensureNotificationCatalog, isNotificationEventKey } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
@@ -23,13 +24,22 @@ async function requireAdmin() {
   return session;
 }
 
+function revalidateNotificationConfiguration(eventKey?: string) {
+  updateTag(NOTIFICATION_CONFIG_CACHE_TAG);
+  revalidatePath("/admin/notifications");
+
+  if (eventKey) {
+    revalidatePath(`/admin/notifications/${eventKey}`);
+  }
+}
+
 export async function toggleNotificationEvent(eventId: string) {
   await requireAdmin();
   await ensureNotificationCatalog();
 
   const event = await prisma.notificationEvent.findUnique({
     where: { id: eventId },
-    select: { id: true, isActive: true },
+    select: { id: true, key: true, isActive: true },
   });
 
   if (!event) {
@@ -43,7 +53,7 @@ export async function toggleNotificationEvent(eventId: string) {
     },
   });
 
-  revalidatePath("/admin/notifications");
+  revalidateNotificationConfiguration(event.key);
 }
 
 export async function updateNotificationTemplate(
@@ -64,7 +74,7 @@ export async function updateNotificationTemplate(
 
   const event = await prisma.notificationEvent.findUnique({
     where: { id: eventId },
-    select: { id: true, template: { select: { id: true } } },
+    select: { id: true, key: true, template: { select: { id: true } } },
   });
 
   if (!event?.template) {
@@ -79,7 +89,7 @@ export async function updateNotificationTemplate(
     },
   });
 
-  revalidatePath("/admin/notifications");
+  revalidateNotificationConfiguration(event.key);
 
   return { success: "Template mis a jour." };
 }
@@ -102,7 +112,7 @@ export async function createNotificationRecipient(
 
   const event = await prisma.notificationEvent.findUnique({
     where: { id: eventId },
-    select: { id: true },
+    select: { id: true, key: true },
   });
 
   if (!event) {
@@ -117,7 +127,7 @@ export async function createNotificationRecipient(
     },
   });
 
-  revalidatePath("/admin/notifications");
+  revalidateNotificationConfiguration(event.key);
 
   return { success: "Destinataire ajoute." };
 }
@@ -127,7 +137,7 @@ export async function toggleNotificationRecipient(recipientId: string) {
 
   const recipient = await prisma.notificationRecipient.findUnique({
     where: { id: recipientId },
-    select: { id: true, isActive: true },
+    select: { id: true, isActive: true, event: { select: { key: true } } },
   });
 
   if (!recipient) {
@@ -141,17 +151,26 @@ export async function toggleNotificationRecipient(recipientId: string) {
     },
   });
 
-  revalidatePath("/admin/notifications");
+  revalidateNotificationConfiguration(recipient.event.key);
 }
 
 export async function deleteNotificationRecipient(recipientId: string) {
   await requireAdmin();
 
+  const recipient = await prisma.notificationRecipient.findUnique({
+    where: { id: recipientId },
+    select: { id: true, event: { select: { key: true } } },
+  });
+
+  if (!recipient) {
+    throw new Error("Destinataire introuvable.");
+  }
+
   await prisma.notificationRecipient.delete({
     where: { id: recipientId },
   });
 
-  revalidatePath("/admin/notifications");
+  revalidateNotificationConfiguration(recipient.event.key);
 }
 
 export async function sendNotificationTest(
