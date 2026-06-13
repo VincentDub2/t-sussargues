@@ -52,6 +52,10 @@ const pageMeta: Record<string, { title: string; description: string }> = {
     title: "Notifications",
     description: "Configuration des emails automatiques, de leurs templates et des tests d'envoi.",
   },
+  "/admin/notifications/logs": {
+    title: "Logs de notifications",
+    description: "Historique pagine des envois, previsualisations et erreurs de notifications.",
+  },
 };
 
 type AppTopbarProps = {
