@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { PurchaseChatLauncher } from "@/components/agent/purchase-chat-launcher";
 import { CreatePurchaseDialog } from "@/components/purchases/create-purchase-dialog";
 import { PurchasesDataTable } from "@/components/purchases/purchases-data-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,11 +107,14 @@ export default async function AchatsPage() {
             </CardDescription>
           </div>
           {permissions["purchase.create"] ? (
-            <CreatePurchaseDialog
-              services={services}
-              defaultServiceId={session.user.serviceId}
-              canChooseService={canChooseService}
-            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <PurchaseChatLauncher />
+              <CreatePurchaseDialog
+                services={services}
+                defaultServiceId={session.user.serviceId}
+                canChooseService={canChooseService}
+              />
+            </div>
           ) : null}
         </CardHeader>
         <CardContent>

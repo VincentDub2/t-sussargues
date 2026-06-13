@@ -1,5 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { tool } from "langchain";
+import { MemorySaver } from "@langchain/langgraph";
+import { createAgent, tool } from "langchain";
 import * as z from "zod";
 
 import type { Priority, Role } from "@/generated/prisma/client";
@@ -8,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { getNextReferenceNumber } from "@/lib/reference-numbers";
 
 const priorities = ["basse", "normale", "haute", "urgente"] as const;
+const interventionCheckpointer = new MemorySaver();
 
 export const interventionDraftSchema = z.object({
   title: z.string().min(3).max(120),
@@ -145,49 +147,79 @@ async function findActiveService(serviceName?: string | null) {
   return service;
 }
 
-export async function buildInterventionDraft(message: string) {
+function getLatestDraftToolArgs(result: unknown) {
+  const messages =
+    result &&
+    typeof result === "object" &&
+    "messages" in result &&
+    Array.isArray(result.messages)
+      ? result.messages
+      : [];
+
+  for (const message of messages.toReversed()) {
+    const toolCalls: Array<{ name?: unknown; args?: unknown }> =
+      message &&
+      typeof message === "object" &&
+      "tool_calls" in message &&
+      Array.isArray(message.tool_calls)
+        ? message.tool_calls
+        : [];
+    const draftToolCall = toolCalls.find(
+      (toolCall) =>
+        toolCall.name === "prepare_intervention_draft"
+    );
+
+    if (draftToolCall && "args" in draftToolCall) {
+      return draftToolCall.args;
+    }
+  }
+
+  return null;
+}
+
+export async function resetInterventionAgentThread(threadId: string) {
+  await interventionCheckpointer.deleteThread(threadId);
+}
+
+export async function buildInterventionDraft(message: string, threadId: string) {
   const context = await getInterventionContext();
-  const model = getModel().bindTools([prepareInterventionDraftTool], {
-    tool_choice: {
-      type: "function",
-      function: {
-        name: "prepare_intervention_draft",
-      },
-    },
-    parallel_tool_calls: false,
+  const agent = createAgent({
+    model: getModel(),
+    tools: [prepareInterventionDraftTool],
+    checkpointer: interventionCheckpointer,
+    systemPrompt: [
+      "You prepare intervention tickets for the Sussargues city hall.",
+      "Extract one intervention draft from the latest user message.",
+      "Use previous conversation turns from memory only to resolve references in the latest request.",
+      "Use French for title and description.",
+      "Use only these priorities: basse, normale, haute, urgente.",
+      "The location field can be free text.",
+      "Do not replace a specific user location with a different available location.",
+      "Use an available location only when it clearly refers to the same place mentioned by the user.",
+      "Only set categoryName and serviceName when they exactly match one available value.",
+      "If category or service is unclear, return null for it.",
+      "Call the prepare_intervention_draft tool exactly once.",
+      `Available context: ${JSON.stringify(context)}`,
+    ].join("\n"),
   });
 
-  const response = await model.invoke([
+  const result = await agent.invoke(
     {
-      role: "system",
-      content: [
-        "You prepare intervention tickets for the Sussargues city hall.",
-        "Extract one intervention draft from the user message.",
-        "Use French for title and description.",
-        "Use only these priorities: basse, normale, haute, urgente.",
-        "The location field can be free text.",
-        "Do not replace a specific user location with a different available location.",
-        "Use an available location only when it clearly refers to the same place mentioned by the user.",
-        "Only set categoryName and serviceName when they exactly match one available value.",
-        "If category or service is unclear, return null for it.",
-        "Call the prepare_intervention_draft tool exactly once.",
-        `Available context: ${JSON.stringify(context)}`,
-      ].join("\n"),
+      messages: [{ role: "user", content: message }],
     },
     {
-      role: "user",
-      content: message,
-    },
-  ]);
-  const draftToolCall = response.tool_calls?.find(
-    (toolCall) => toolCall.name === "prepare_intervention_draft"
+      configurable: {
+        thread_id: threadId,
+      },
+    }
   );
+  const draftArgs = getLatestDraftToolArgs(result);
 
-  if (!draftToolCall) {
+  if (!draftArgs) {
     throw new Error("L'assistant n'a pas prepare de brouillon d'intervention.");
   }
 
-  const draft = interventionDraftSchema.parse(draftToolCall.args);
+  const draft = interventionDraftSchema.parse(draftArgs);
 
   return {
     ...draft,

@@ -6,13 +6,13 @@ import {
   Bot,
   CheckCircle2,
   Loader2,
-  MessageCircle,
+  ReceiptText,
   RotateCcw,
   Send,
   X,
 } from "lucide-react";
 
-import type { InterventionDraft } from "@/lib/intervention-agent";
+import type { PurchaseDraft } from "@/lib/purchase-agent";
 import { PRIORITY_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 
-type InterventionChatLauncherProps = {
-  variant?: "floating" | "inline";
+type PurchaseChatLauncherProps = {
+  variant?: "inline";
 };
 
 type ChatMessage = {
@@ -36,9 +36,9 @@ type ChatMessage = {
   content: string;
 };
 
-type CreatedIntervention = {
+type CreatedPurchase = {
   id: string;
-  ticketNumber: string;
+  requestNumber: string;
   title: string;
 };
 
@@ -50,12 +50,23 @@ function createMessage(role: ChatMessage["role"], content: string): ChatMessage 
   };
 }
 
+function formatCurrency(value: number | null) {
+  if (value === null) {
+    return null;
+  }
+
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(value);
+}
+
 async function readApiResponse(response: Response) {
   const payload = (await response.json()) as {
     error?: string;
     reply?: string;
-    draft?: InterventionDraft;
-    intervention?: CreatedIntervention;
+    draft?: PurchaseDraft;
+    purchase?: CreatedPurchase;
   };
 
   if (!response.ok) {
@@ -65,17 +76,19 @@ async function readApiResponse(response: Response) {
   return payload;
 }
 
-export function InterventionChatLauncher({
-  variant = "floating",
-}: InterventionChatLauncherProps) {
+export function PurchaseChatLauncher({
+  variant = "inline",
+}: PurchaseChatLauncherProps) {
+  void variant;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [draft, setDraft] = useState<InterventionDraft | null>(null);
-  const [createdIntervention, setCreatedIntervention] =
-    useState<CreatedIntervention | null>(null);
+  const [draft, setDraft] = useState<PurchaseDraft | null>(null);
+  const [createdPurchase, setCreatedPurchase] = useState<CreatedPurchase | null>(
+    null
+  );
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    createMessage("assistant", "Assistant intervention pret."),
+    createMessage("assistant", "Assistant achat pret."),
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -83,7 +96,7 @@ export function InterventionChatLauncher({
     if (open) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [messages, open, draft, createdIntervention]);
+  }, [messages, open, draft, createdPurchase]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,12 +109,12 @@ export function InterventionChatLauncher({
 
     setInput("");
     setDraft(null);
-    setCreatedIntervention(null);
+    setCreatedPurchase(null);
     setLoading(true);
     setMessages((current) => [...current, createMessage("user", message)]);
 
     try {
-      const payload = await fetch("/api/agent/intervention", {
+      const payload = await fetch("/api/agent/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "draft", message }),
@@ -132,7 +145,7 @@ export function InterventionChatLauncher({
     }
   }
 
-  async function handleCreateIntervention() {
+  async function handleCreatePurchase() {
     if (!draft || loading) {
       return;
     }
@@ -140,20 +153,20 @@ export function InterventionChatLauncher({
     setLoading(true);
 
     try {
-      const payload = await fetch("/api/agent/intervention", {
+      const payload = await fetch("/api/agent/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "create", draft }),
       }).then(readApiResponse);
 
-      if (payload.intervention) {
-        setCreatedIntervention(payload.intervention);
+      if (payload.purchase) {
+        setCreatedPurchase(payload.purchase);
       }
 
       setDraft(null);
       setMessages((current) => [
         ...current,
-        createMessage("assistant", payload.reply ?? "Intervention creee."),
+        createMessage("assistant", payload.reply ?? "Demande creee."),
       ]);
     } catch (error) {
       setMessages((current) => [
@@ -176,11 +189,11 @@ export function InterventionChatLauncher({
         <header className="flex items-center justify-between border-b border-border bg-primary px-5 py-4 text-primary-foreground">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex size-11 items-center justify-center rounded-md bg-accent text-accent-foreground">
-              <Bot className="size-6" />
+              <ReceiptText className="size-6" />
             </span>
             <div className="min-w-0">
               <SheetTitle className="truncate text-base font-bold text-primary-foreground">
-                Assistant intervention
+                Assistant achat
               </SheetTitle>
               <SheetDescription className="text-xs text-primary-foreground/80">
                 Sussargues
@@ -191,7 +204,7 @@ export function InterventionChatLauncher({
             type="button"
             className="rounded-md p-2 text-primary-foreground/80 transition hover:bg-primary-deep hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             onClick={() => setOpen(false)}
-            aria-label="Fermer l'assistant"
+            aria-label="Fermer l'assistant achat"
           >
             <X className="size-5" />
           </button>
@@ -227,32 +240,41 @@ export function InterventionChatLauncher({
               </div>
               <dl className="grid gap-4 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="font-semibold text-foreground">Titre</dt>
+                  <dt className="font-semibold text-foreground">Objet</dt>
                   <dd className="mt-1 text-muted">{draft.title}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold text-foreground">Lieu</dt>
-                  <dd className="mt-1 text-muted">{draft.location}</dd>
+                  <dt className="font-semibold text-foreground">Budget estime</dt>
+                  <dd className="mt-1 text-muted">
+                    {formatCurrency(draft.estimatedBudget) ?? "Non renseigne"}
+                  </dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="font-semibold text-foreground">Description</dt>
+                  <dt className="font-semibold text-foreground">Besoin</dt>
                   <dd className="mt-1 text-muted">{draft.description}</dd>
                 </div>
-                {draft.categoryName || draft.serviceName ? (
+                <div>
+                  <dt className="font-semibold text-foreground">Fournisseur</dt>
+                  <dd className="mt-1 text-muted">
+                    {draft.supplier ?? "Non renseigne"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-foreground">Quantite</dt>
+                  <dd className="mt-1 text-muted">
+                    {draft.quantity ?? "Non renseignee"}
+                  </dd>
+                </div>
+                {draft.serviceName ? (
                   <div className="flex flex-wrap gap-2 sm:col-span-2">
-                    {draft.categoryName ? (
-                      <Badge variant="secondary">{draft.categoryName}</Badge>
-                    ) : null}
-                    {draft.serviceName ? (
-                      <Badge variant="secondary">{draft.serviceName}</Badge>
-                    ) : null}
+                    <Badge variant="secondary">{draft.serviceName}</Badge>
                   </div>
                 ) : null}
               </dl>
               <div className="mt-5 flex gap-2">
                 <Button
                   type="button"
-                  onClick={handleCreateIntervention}
+                  onClick={handleCreatePurchase}
                   disabled={loading}
                   className="flex-1"
                 >
@@ -261,7 +283,7 @@ export function InterventionChatLauncher({
                   ) : (
                     <CheckCircle2 className="size-4" />
                   )}
-                  Creer le ticket
+                  Creer la demande
                 </Button>
                 <Button
                   type="button"
@@ -276,17 +298,15 @@ export function InterventionChatLauncher({
             </div>
           ) : null}
 
-          {createdIntervention ? (
+          {createdPurchase ? (
             <div className="rounded-lg border border-success/20 bg-card p-4 text-sm shadow-sm">
               <div className="mb-2 flex items-center gap-2 font-bold text-success">
                 <CheckCircle2 className="size-4" />
-                {createdIntervention.ticketNumber}
+                {createdPurchase.requestNumber}
               </div>
-              <p className="mb-3 text-muted">{createdIntervention.title}</p>
+              <p className="mb-3 text-muted">{createdPurchase.title}</p>
               <Button asChild size="sm" variant="outline">
-                <Link href={`/interventions/${createdIntervention.id}`}>
-                  Ouvrir le ticket
-                </Link>
+                <Link href={`/achats/${createdPurchase.id}`}>Ouvrir la demande</Link>
               </Button>
             </div>
           ) : null}
@@ -307,7 +327,7 @@ export function InterventionChatLauncher({
             <Textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Decrire l'intervention..."
+              placeholder="Decrire la demande d'achat..."
               rows={3}
               className="min-h-24 resize-none"
               disabled={loading}
@@ -330,34 +350,15 @@ export function InterventionChatLauncher({
     </SheetContent>
   );
 
-  if (variant === "inline") {
-    return (
-      <Sheet open={open} onOpenChange={setOpen}>
-        {chatPanel}
-        <SheetTrigger asChild>
-          <Button type="button" variant="outline">
-            <Bot className="size-4" />
-            Assistant
-          </Button>
-        </SheetTrigger>
-      </Sheet>
-    );
-  }
-
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
-      <Sheet open={open} onOpenChange={setOpen}>
-        {chatPanel}
-        <SheetTrigger asChild>
-          <button
-            type="button"
-            className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/25 transition hover:bg-primary-deep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
-            aria-label="Ouvrir l'assistant intervention"
-          >
-            <MessageCircle className="size-6" />
-          </button>
-        </SheetTrigger>
-      </Sheet>
-    </div>
+    <Sheet open={open} onOpenChange={setOpen}>
+      {chatPanel}
+      <SheetTrigger asChild>
+        <Button type="button" variant="outline">
+          <Bot className="size-4" />
+          Assistant
+        </Button>
+      </SheetTrigger>
+    </Sheet>
   );
 }

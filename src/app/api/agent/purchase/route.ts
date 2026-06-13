@@ -1,13 +1,14 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import * as z from "zod";
 
 import { auth } from "@/auth";
 import {
-  buildInterventionDraft,
-  createInterventionFromDraft,
-  interventionDraftSchema,
-  resetInterventionAgentThread,
-} from "@/lib/intervention-agent";
+  buildPurchaseDraft,
+  createPurchaseFromDraft,
+  purchaseDraftSchema,
+  resetPurchaseAgentThread,
+} from "@/lib/purchase-agent";
 import { getRolePermissions } from "@/lib/permissions";
 
 const requestSchema = z.discriminatedUnion("action", [
@@ -17,7 +18,7 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("create"),
-    draft: interventionDraftSchema,
+    draft: purchaseDraftSchema,
   }),
   z.object({
     action: z.literal("reset"),
@@ -33,9 +34,9 @@ export async function POST(request: Request) {
 
   const permissions = await getRolePermissions(session.user.role);
 
-  if (!permissions["intervention.create"]) {
+  if (!permissions["purchase.create"]) {
     return NextResponse.json(
-      { error: "Vous n'avez pas les droits pour creer une intervention." },
+      { error: "Vous n'avez pas les droits pour creer une demande d'achat." },
       { status: 403 }
     );
   }
@@ -47,18 +48,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const threadId = `intervention:${session.user.id}`;
+    const threadId = `purchase:${session.user.id}`;
 
     if (parsed.data.action === "reset") {
-      await resetInterventionAgentThread(threadId);
+      await resetPurchaseAgentThread(threadId);
 
       return NextResponse.json({ messages: [] });
     }
 
     if (parsed.data.action === "draft") {
-      const draft = await buildInterventionDraft(parsed.data.message, threadId);
+      const draft = await buildPurchaseDraft(parsed.data.message, threadId);
       const reply =
-        "J'ai prepare un brouillon d'intervention. Verifiez les informations avant de creer le ticket.";
+        "J'ai prepare un brouillon de demande d'achat. Verifiez les informations avant de creer la demande.";
 
       return NextResponse.json({
         draft,
@@ -66,19 +67,23 @@ export async function POST(request: Request) {
       });
     }
 
-    const intervention = await createInterventionFromDraft(
+    const purchase = await createPurchaseFromDraft(
       {
         id: session.user.id,
         role: session.user.role,
+        serviceId: session.user.serviceId,
         firstName: session.user.firstName,
         lastName: session.user.lastName,
+        canChooseService: permissions["purchase.choose_service"],
       },
       parsed.data.draft
     );
-    const reply = `Intervention ${intervention.ticketNumber} creee.`;
+    const reply = `Demande ${purchase.requestNumber} creee.`;
+
+    revalidatePath("/achats");
 
     return NextResponse.json({
-      intervention,
+      purchase,
       reply,
     });
   } catch (error) {
