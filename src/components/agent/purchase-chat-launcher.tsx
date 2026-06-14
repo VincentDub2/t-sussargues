@@ -11,6 +11,8 @@ import {
   Send,
   X,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { PurchaseDraft } from "@/lib/purchase-agent";
 import { PRIORITY_LABELS } from "@/lib/labels";
@@ -42,7 +44,8 @@ type CreatedPurchase = {
   title: string;
 };
 
-const initialAssistantMessage = "Assistant achat pret.";
+const initialAssistantMessage =
+  "Bonjour, je peux vous aider a gerer les demandes d'achat. Vous pouvez me demander de creer, retrouver, mettre a jour, valider, refuser ou annuler une demande d'achat. Comment puis-je vous aider ?";
 
 function createMessage(role: ChatMessage["role"], content: string): ChatMessage {
   return {
@@ -78,6 +81,39 @@ async function readApiResponse(response: Response) {
   return payload;
 }
 
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <div className="space-y-3 break-words text-sm leading-6 [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_code]:rounded [&_code]:bg-secondary [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em] [&_li]:pl-1 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:m-0 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-secondary [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:ml-5 [&_ul]:list-disc">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  );
+}
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === "user";
+
+  return (
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "max-w-[92%] rounded-lg px-4 py-3 shadow-sm sm:max-w-[82%]",
+          isUser
+            ? "bg-primary text-primary-foreground"
+            : "border border-border bg-card text-foreground"
+        )}
+      >
+        {isUser ? (
+          <p className="whitespace-pre-wrap break-words text-sm leading-6">
+            {message.content}
+          </p>
+        ) : (
+          <MarkdownMessage content={message.content} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function PurchaseChatLauncher({
   variant = "inline",
 }: PurchaseChatLauncherProps) {
@@ -100,9 +136,7 @@ export function PurchaseChatLauncher({
     }
   }, [messages, open, draft, createdPurchase]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function submitMessage() {
     const message = input.trim();
 
     if (!message || loading) {
@@ -119,11 +153,15 @@ export function PurchaseChatLauncher({
       const payload = await fetch("/api/agent/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "draft", message }),
+        body: JSON.stringify({ action: "message", message }),
       }).then(readApiResponse);
 
       if (payload.draft) {
         setDraft(payload.draft);
+      }
+
+      if (payload.purchase) {
+        setCreatedPurchase(payload.purchase);
       }
 
       setMessages((current) => [
@@ -145,6 +183,20 @@ export function PurchaseChatLauncher({
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void submitMessage();
+  }
+
+  function handleInputKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    void submitMessage();
   }
 
   async function handleCreatePurchase() {
@@ -254,26 +306,9 @@ export function PurchaseChatLauncher({
           </div>
         </header>
 
-        <div className="flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex",
-                message.role === "user" ? "justify-end" : "justify-start"
-              )}
-            >
-              <div
-                className={cn(
-                  "max-w-[88%] rounded-lg px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[78%]",
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-card text-foreground"
-                )}
-              >
-                {message.content}
-              </div>
-            </div>
+            <ChatBubble key={message.id} message={message} />
           ))}
 
           {draft ? (
@@ -371,9 +406,10 @@ export function PurchaseChatLauncher({
             <Textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Decrire la demande d'achat..."
+              onKeyDown={handleInputKeyDown}
+              placeholder="Ecrivez votre message..."
               rows={3}
-              className="min-h-24 resize-none"
+              className="max-h-44 min-h-24 resize-none"
               disabled={loading}
             />
             <Button

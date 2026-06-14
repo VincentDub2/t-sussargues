@@ -8,10 +8,15 @@ import {
   createPurchaseFromDraft,
   purchaseDraftSchema,
   resetPurchaseAgentThread,
+  runPurchaseAgentMessage,
 } from "@/lib/purchase-agent";
 import { getRolePermissions } from "@/lib/permissions";
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("message"),
+    message: z.string().min(3).max(2000),
+  }),
   z.object({
     action: z.literal("draft"),
     message: z.string().min(3).max(2000),
@@ -34,9 +39,13 @@ export async function POST(request: Request) {
 
   const permissions = await getRolePermissions(session.user.role);
 
-  if (!permissions["purchase.create"]) {
+  if (
+    !permissions["purchase.create"] &&
+    !permissions["purchase.validate"] &&
+    !permissions["purchase.view_all"]
+  ) {
     return NextResponse.json(
-      { error: "Vous n'avez pas les droits pour creer une demande d'achat." },
+      { error: "Vous n'avez pas les droits pour utiliser l'assistant achat." },
       { status: 403 }
     );
   }
@@ -57,6 +66,13 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.action === "draft") {
+      if (!permissions["purchase.create"]) {
+        return NextResponse.json(
+          { error: "Vous n'avez pas les droits pour creer une demande d'achat." },
+          { status: 403 }
+        );
+      }
+
       const draft = await buildPurchaseDraft(parsed.data.message, threadId);
       const reply =
         "J'ai prepare un brouillon de demande d'achat. Verifiez les informations avant de creer la demande.";
@@ -67,6 +83,36 @@ export async function POST(request: Request) {
       });
     }
 
+    if (parsed.data.action === "message") {
+      const response = await runPurchaseAgentMessage(
+        {
+          id: session.user.id,
+          role: session.user.role,
+          serviceId: session.user.serviceId,
+          firstName: session.user.firstName,
+          lastName: session.user.lastName,
+          canChooseService: permissions["purchase.choose_service"],
+          permissions,
+        },
+        parsed.data.message,
+        threadId
+      );
+
+      revalidatePath("/achats");
+      if (response.purchase?.id) {
+        revalidatePath(`/achats/${response.purchase.id}`);
+      }
+
+      return NextResponse.json(response);
+    }
+
+    if (!permissions["purchase.create"]) {
+      return NextResponse.json(
+        { error: "Vous n'avez pas les droits pour creer une demande d'achat." },
+        { status: 403 }
+      );
+    }
+
     const purchase = await createPurchaseFromDraft(
       {
         id: session.user.id,
@@ -75,6 +121,7 @@ export async function POST(request: Request) {
         firstName: session.user.firstName,
         lastName: session.user.lastName,
         canChooseService: permissions["purchase.choose_service"],
+        permissions,
       },
       parsed.data.draft
     );
