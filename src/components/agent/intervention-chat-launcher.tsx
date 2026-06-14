@@ -11,6 +11,8 @@ import {
   Send,
   X,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { InterventionDraft } from "@/lib/intervention-agent";
 import { PRIORITY_LABELS } from "@/lib/labels";
@@ -42,7 +44,8 @@ type CreatedIntervention = {
   title: string;
 };
 
-const initialAssistantMessage = "Assistant intervention pret.";
+const initialAssistantMessage =
+  "Bienvenue, je suis votre assistant de gestion des interventions.\n\nJe peux vous aider à créer une demande d’intervention, retrouver un ticket existant, consulter ses détails, le modifier ou suivre son statut.\n\nComment puis-je vous aider aujourd’hui ?";
 
 function createMessage(role: ChatMessage["role"], content: string): ChatMessage {
   return {
@@ -67,6 +70,65 @@ async function readApiResponse(response: Response) {
   return payload;
 }
 
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <div className="max-w-full space-y-3 break-words text-sm leading-6 [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted [&_code]:rounded [&_code]:bg-secondary [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em] [&_li]:pl-1 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:m-0 [&_p]:whitespace-pre-wrap [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-secondary [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:ml-5 [&_ul]:list-disc">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          table: ({ children }) => (
+            <div className="my-3 max-w-full overflow-x-auto rounded-md border border-border">
+              <table className="min-w-full border-collapse text-left text-xs leading-5 sm:text-sm">
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-secondary text-foreground">{children}</thead>
+          ),
+          th: ({ children }) => (
+            <th className="whitespace-nowrap border-b border-border px-3 py-2 font-semibold">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border-t border-border px-3 py-2 align-top text-foreground">
+              {children}
+            </td>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === "user";
+
+  return (
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "rounded-lg px-4 py-3 shadow-sm",
+          isUser
+            ? "max-w-[88%] bg-primary text-primary-foreground sm:max-w-[78%]"
+            : "max-w-[96%] border border-border bg-card text-foreground sm:max-w-[92%]"
+        )}
+      >
+        {isUser ? (
+          <p className="whitespace-pre-wrap break-words text-sm leading-6">
+            {message.content}
+          </p>
+        ) : (
+          <MarkdownMessage content={message.content} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function InterventionChatLauncher({
   variant = "floating",
 }: InterventionChatLauncherProps) {
@@ -87,9 +149,7 @@ export function InterventionChatLauncher({
     }
   }, [messages, open, draft, createdIntervention]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function submitMessage() {
     const message = input.trim();
 
     if (!message || loading) {
@@ -106,11 +166,15 @@ export function InterventionChatLauncher({
       const payload = await fetch("/api/agent/intervention", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "draft", message }),
+        body: JSON.stringify({ action: "message", message }),
       }).then(readApiResponse);
 
       if (payload.draft) {
         setDraft(payload.draft);
+      }
+
+      if (payload.intervention) {
+        setCreatedIntervention(payload.intervention);
       }
 
       setMessages((current) => [
@@ -132,6 +196,20 @@ export function InterventionChatLauncher({
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void submitMessage();
+  }
+
+  function handleInputKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    void submitMessage();
   }
 
   async function handleCreateIntervention() {
@@ -243,24 +321,7 @@ export function InterventionChatLauncher({
 
         <div className="flex-1 space-y-4 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex",
-                message.role === "user" ? "justify-end" : "justify-start"
-              )}
-            >
-              <div
-                className={cn(
-                  "max-w-[88%] rounded-lg px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[78%]",
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-card text-foreground"
-                )}
-              >
-                {message.content}
-              </div>
-            </div>
+            <ChatBubble key={message.id} message={message} />
           ))}
 
           {draft ? (
@@ -351,6 +412,7 @@ export function InterventionChatLauncher({
             <Textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleInputKeyDown}
               placeholder="Decrire l'intervention..."
               rows={3}
               className="min-h-24 resize-none"

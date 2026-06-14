@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import * as z from "zod";
 
@@ -7,10 +8,15 @@ import {
   createInterventionFromDraft,
   interventionDraftSchema,
   resetInterventionAgentThread,
+  runInterventionAgentMessage,
 } from "@/lib/intervention-agent";
 import { getRolePermissions } from "@/lib/permissions";
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("message"),
+    message: z.string().min(3).max(2000),
+  }),
   z.object({
     action: z.literal("draft"),
     message: z.string().min(3).max(2000),
@@ -33,9 +39,13 @@ export async function POST(request: Request) {
 
   const permissions = await getRolePermissions(session.user.role);
 
-  if (!permissions["intervention.create"]) {
+  if (
+    !permissions["intervention.create"] &&
+    !permissions["intervention.manage"] &&
+    !permissions["intervention.view_all"]
+  ) {
     return NextResponse.json(
-      { error: "Vous n'avez pas les droits pour creer une intervention." },
+      { error: "Vous n'avez pas les droits pour utiliser l'assistant intervention." },
       { status: 403 }
     );
   }
@@ -56,6 +66,13 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.action === "draft") {
+      if (!permissions["intervention.create"]) {
+        return NextResponse.json(
+          { error: "Vous n'avez pas les droits pour creer une intervention." },
+          { status: 403 }
+        );
+      }
+
       const draft = await buildInterventionDraft(parsed.data.message, threadId);
       const reply =
         "J'ai prepare un brouillon d'intervention. Verifiez les informations avant de creer le ticket.";
@@ -66,16 +83,49 @@ export async function POST(request: Request) {
       });
     }
 
+    if (parsed.data.action === "message") {
+      const response = await runInterventionAgentMessage(
+        {
+          id: session.user.id,
+          role: session.user.role,
+          serviceId: session.user.serviceId,
+          firstName: session.user.firstName,
+          lastName: session.user.lastName,
+          permissions,
+        },
+        parsed.data.message,
+        threadId
+      );
+
+      revalidatePath("/interventions");
+      if (response.intervention?.id) {
+        revalidatePath(`/interventions/${response.intervention.id}`);
+      }
+
+      return NextResponse.json(response);
+    }
+
+    if (!permissions["intervention.create"]) {
+      return NextResponse.json(
+        { error: "Vous n'avez pas les droits pour creer une intervention." },
+        { status: 403 }
+      );
+    }
+
     const intervention = await createInterventionFromDraft(
       {
         id: session.user.id,
         role: session.user.role,
+        serviceId: session.user.serviceId,
         firstName: session.user.firstName,
         lastName: session.user.lastName,
+        permissions,
       },
       parsed.data.draft
     );
     const reply = `Intervention ${intervention.ticketNumber} creee.`;
+
+    revalidatePath("/interventions");
 
     return NextResponse.json({
       intervention,
